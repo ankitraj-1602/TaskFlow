@@ -5,6 +5,9 @@ const morgan = require('morgan');
 const compression = require('compression');
 require('dotenv').config();
 
+const authRoutes = require('./routes/auth.routes');
+const { apiRateLimiter } = require('./middleware/rateLimit.middleware');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -19,6 +22,9 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Rate limiting
+app.use('/api', apiRateLimiter);
+
 // Health check route
 app.get('/health', (req, res) => {
   res.json({
@@ -30,8 +36,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Routes (to be added in Day 2)
-// app.use('/api/auth', require('./routes/auth.routes'));
+// Routes
+app.use('/api/auth', authRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -60,5 +66,6 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 TaskFlow backend running on http://localhost:${PORT}`);
   console.log(`📝 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔐 Auth routes: http://localhost:${PORT}/api/auth`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
