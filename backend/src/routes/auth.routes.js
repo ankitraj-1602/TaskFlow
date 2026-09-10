@@ -3,6 +3,7 @@ const AuthController = require('../controllers/auth.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 const { validate } = require('../middleware/validation.middleware');
 const { authRateLimiter } = require('../middleware/rateLimit.middleware');
+const Joi = require("joi")
 const {
   registerSchema,
   loginSchema,
@@ -41,6 +42,14 @@ router.post(
   AuthController.resetPassword
 );
 
+router.post(
+  '/verify-email',
+  validate(Joi.object({
+    token: Joi.string().required(),
+  })),
+  AuthController.verifyEmail
+);
+
 // Protected routes
 router.use(authenticate);
 
@@ -57,5 +66,7 @@ router.patch(
   validate(changePasswordSchema),
   AuthController.changePassword
 );
+
+router.post('/send-verification', AuthController.sendVerificationEmail);
 
 module.exports = router;

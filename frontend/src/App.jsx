@@ -14,6 +14,7 @@ import { ProjectDetail } from './pages/ProjectDetail';
 import { ProjectSettings } from './pages/ProjectSettings';
 import { Tasks } from './pages/Tasks';
 import { MyTasks } from './pages/MyTasks';
+import { VerifyEmail } from './pages/VerifyEmail';  // ⬅️ ADD THIS LINE
 
 function App() {
   const { loadUser, isAuthenticated } = useAuthStore();
@@ -41,23 +42,24 @@ function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />  {/* ⬅️ This route */}
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/my-tasks" element={<MyTasks />} />
-        
+
         {/* Workspace routes */}
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/workspaces/:id" element={<WorkspaceDetail />} />
         <Route path="/workspaces/:id/settings" element={<WorkspaceSettings />} />
-        
+
         {/* Project routes */}
         <Route path="/workspaces/:workspaceId/projects" element={<Projects />} />
         <Route path="/workspaces/:workspaceId/projects/:projectId" element={<ProjectDetail />} />
         <Route path="/workspaces/:workspaceId/projects/:projectId/settings" element={<ProjectSettings />} />
-        
+
         {/* Task routes */}
         <Route path="/workspaces/:workspaceId/projects/:projectId/tasks" element={<Tasks />} />
-        
+
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>

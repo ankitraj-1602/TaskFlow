@@ -1,55 +1,76 @@
 const UserQueries = require('../db/queries/user.queries');
 const { hashPassword, comparePassword } = require('../utils/password.utils');
-const { 
-  generateAccessToken, 
-  generateRefreshToken, 
+const {
+  generateAccessToken,
+  generateRefreshToken,
   getTokenExpiry,
   verifyAccessToken,
-  verifyRefreshToken 
+  verifyRefreshToken,
 } = require('../utils/jwt.utils');
+const emailService = require('./email.service');
+const {
+  createEmailVerificationToken,
+  verifyEmailVerificationToken,
+  createPasswordResetToken,
+  verifyPasswordResetToken,
+  markPasswordResetTokenUsed,
+} = require('../utils/token.utils');
 
 class UserService {
-  async register(userData) {
-    const { email, password, name, jobTitle, timezone } = userData;
+async register(userData) {
+  const { email, password, name, jobTitle, timezone } = userData;
 
-    // Check if user already exists
-    const existingUser = await UserQueries.findByEmail(email);
-    if (existingUser) {
-      throw new Error('User with this email already exists');
-    }
-
-    // Hash password
-    const hashedPassword = await hashPassword(password);
-
-    // Create user
-    const user = await UserQueries.create({
-      email,
-      password_hash: hashedPassword,
-      name,
-      job_title: jobTitle,
-      timezone: timezone || 'UTC',
-    });
-
-    // Generate tokens
-    const accessToken = generateAccessToken({
-      userId: user.id,
-      email: user.email,
-    });
-
-    const refreshToken = generateRefreshToken({
-      userId: user.id,
-      email: user.email,
-    });
-
-    // Store refresh token
-    const tokenExpiry = getTokenExpiry(refreshToken);
-    await UserQueries.updateRefreshToken(user.id, refreshToken, tokenExpiry);
-
-    return {
-      user,
-      tokens: { accessToken, refreshToken },
-    };
+  // Check if user already exists
+  const existingUser = await UserQueries.findByEmail(email);
+  if (existingUser) {
+    throw new Error('User with this email already exists');
   }
+
+  // Hash password
+  const hashedPassword = await hashPassword(password);
+
+  // Create user
+  const user = await UserQueries.create({
+    email,
+    password_hash: hashedPassword,
+    name,
+    job_title: jobTitle,
+    timezone: timezone || 'UTC',
+  });
+
+  // Generate tokens
+  const accessToken = generateAccessToken({
+    userId: user.id,
+    email: user.email,
+  });
+
+  const refreshToken = generateRefreshToken({
+    userId: user.id,
+    email: user.email,
+  });
+
+  // Store refresh token
+  const tokenExpiry = getTokenExpiry(refreshToken);
+  await UserQueries.updateRefreshToken(user.id, refreshToken, tokenExpiry);
+
+  // Send verification email (non-blocking, but catch errors)
+  try {
+    const verificationToken = await createEmailVerificationToken(user.id, 24);
+    await emailService.sendVerificationEmail({
+      to: user.email,
+      name: user.name,
+      token: verificationToken,
+    });
+  } catch (emailError) {
+    console.error('Failed to send verification email:', emailError.message);
+    // Don't fail registration if email fails
+  }
+
+  return {
+    user,
+    tokens: { accessToken, refreshToken },
+  };
+}
 
   async login(email, password) {
     // Find user
@@ -191,40 +212,126 @@ class UserService {
     return true;
   }
 
-  async forgotPassword(email) {
-    const user = await UserQueries.findByEmail(email);
-    if (!user) {
-      throw new Error('User not found');
-    }
+//   async forgotPassword(email) {
+//     const user = await UserQueries.findByEmail(email);
+//     if (!user) {
+//       throw new Error('User not found');
+//     }
 
-    // Generate reset token (using JWT)
-    const resetToken = generateAccessToken({
-      userId: user.id,
-      email: user.email,
-    });
+//     // Generate reset token (using JWT)
+//     const resetToken = generateAccessToken({
+//       userId: user.id,
+//       email: user.email,
+//     });
 
-    // In a real app, you'd send this via email
-    return {
-      resetToken,
-      message: 'Password reset token generated',
-    };
+//     // In a real app, you'd send this via email
+//     return {
+//       resetToken,
+//       message: 'Password reset token generated',
+//     };
+//   }
+
+//   async resetPassword(token, newPassword) {
+//     // Verify token
+//     const decoded = verifyAccessToken(token);
+//     if (!decoded) {
+//       throw new Error('Invalid or expired reset token');
+//     }
+
+//     const hashedPassword = await hashPassword(newPassword);
+//     await UserQueries.updatePassword(decoded.userId, hashedPassword);
+
+//     // Clear all refresh tokens
+//     await UserQueries.clearRefreshToken(decoded.userId);
+
+//     return true;
+//   }
+
+  async sendVerificationEmail(userId) {
+  const user = await UserQueries.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
   }
 
-  async resetPassword(token, newPassword) {
-    // Verify token
-    const decoded = verifyAccessToken(token);
-    if (!decoded) {
-      throw new Error('Invalid or expired reset token');
-    }
-
-    const hashedPassword = await hashPassword(newPassword);
-    await UserQueries.updatePassword(decoded.userId, hashedPassword);
-
-    // Clear all refresh tokens
-    await UserQueries.clearRefreshToken(decoded.userId);
-
-    return true;
+  if (user.is_email_verified) {
+    throw new Error('Email is already verified');
   }
+
+  const verificationToken = await createEmailVerificationToken(userId, 24);
+  await emailService.sendVerificationEmail({
+    to: user.email,
+    name: user.name,
+    token: verificationToken,
+  });
+
+  return true;
 }
+
+async verifyEmail(token) {
+  const result = await verifyEmailVerificationToken(token);
+  if (!result) {
+    throw new Error('Invalid or expired verification token');
+  }
+
+  const user = await UserQueries.findById(result.userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  if (user.is_email_verified) {
+    return user; // Already verified
+  }
+
+  await UserQueries.verifyEmail(result.userId);
+
+  // Send welcome email
+  try {
+    await emailService.sendWelcomeEmail({
+      to: user.email,
+      name: user.name,
+    });
+  } catch (emailError) {
+    console.error('Failed to send welcome email:', emailError.message);
+  }
+
+  return { ...user, is_email_verified: true };
+}
+
+async forgotPassword(email) {
+  const user = await UserQueries.findByEmail(email);
+  if (!user) {
+    // Don't reveal if user exists or not (security best practice)
+    return { message: 'If that email exists, a reset link has been sent.' };
+  }
+
+  const resetToken = await createPasswordResetToken(user.id, 1);
+  await emailService.sendPasswordResetEmail({
+    to: user.email,
+    name: user.name,
+    token: resetToken,
+  });
+
+  return { message: 'If that email exists, a reset link has been sent.' };
+}
+
+async resetPassword(token, newPassword) {
+  const result = await verifyPasswordResetToken(token);
+  if (!result) {
+    throw new Error('Invalid or expired reset token');
+  }
+
+  const hashedPassword = await hashPassword(newPassword);
+  await UserQueries.updatePassword(result.userId, hashedPassword);
+
+  // Mark token as used
+  await markPasswordResetTokenUsed(result.tokenId);
+
+  // Clear all refresh tokens for security
+  await UserQueries.clearRefreshToken(result.userId);
+
+  return true;
+}
+}
+
 
 module.exports = UserService;

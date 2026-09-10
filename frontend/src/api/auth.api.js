@@ -40,4 +40,12 @@ export const authApi = {
   resetPassword: (data) => {
     return apiClient.post('/auth/reset-password', data);
   },
+
+  verifyEmail: (token) => {
+  return apiClient.post('/auth/verify-email', { token });
+},
+
+sendVerificationEmail: () => {
+  return apiClient.post('/auth/send-verification');
+},
 };

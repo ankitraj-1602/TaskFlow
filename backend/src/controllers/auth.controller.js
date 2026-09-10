@@ -144,6 +144,33 @@ class AuthController {
       errorResponse(res, error.message, 400);
     }
   }
+
+  static async sendVerificationEmail(req, res) {
+  try {
+    if (!req.user) {
+      return errorResponse(res, 'User not authenticated', 401);
+    }
+
+    await userService.sendVerificationEmail(req.user.userId);
+    successResponse(res, null, 'Verification email sent successfully');
+  } catch (error) {
+    errorResponse(res, error.message, 400);
+  }
+}
+
+static async verifyEmail(req, res) {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return errorResponse(res, 'Verification token is required', 400);
+    }
+
+    const user = await userService.verifyEmail(token);
+    successResponse(res, { email: user.email }, 'Email verified successfully');
+  } catch (error) {
+    errorResponse(res, error.message, 400);
+  }
+}
 }
 
 module.exports = AuthController;

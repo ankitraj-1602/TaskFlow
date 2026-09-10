@@ -1,6 +1,7 @@
 import React from 'react';
 import { ProtectedLayout } from '../components/Layout/ProtectedLayout';
 import { useAuthStore } from '../store/auth.store';
+import { EmailVerificationBanner } from '../components/UI/EmailVerificationBanner';
 
 export const Dashboard = () => {
   const { user } = useAuthStore();
@@ -8,6 +9,9 @@ export const Dashboard = () => {
   return (
     <ProtectedLayout>
       <div className="space-y-6">
+        {/* Email Verification Banner (shows only if unverified) */}
+        <EmailVerificationBanner />
+
         <div>
           <h2 className="text-2xl font-bold text-gray-900">
             Welcome back, {user?.name}!
