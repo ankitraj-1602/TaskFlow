@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { ProtectedLayout } from '../components/Layout/ProtectedLayout';
 import { Button } from '../components/Forms/Button';
 import { useWorkspaceStore } from '../store/workspace.store';
+import { useProjectStore } from '../store/project.store';
+
 import { 
   ArrowLeftIcon, 
   UsersIcon, 
@@ -17,6 +19,8 @@ export const WorkspaceDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { currentWorkspace, loadWorkspaceMembers, members, isLoading } = useWorkspaceStore();
+  const { projects, loadWorkspaceProjects } = useProjectStore();
+
   const [workspace, setWorkspace] = useState(null);
 
   useEffect(() => {
@@ -39,6 +43,12 @@ export const WorkspaceDetail = () => {
     loadWorkspace();
   }, [id]);
 
+  useEffect(() => {
+  if (id) {
+    loadWorkspaceProjects(id);
+  }
+}, [id]);
+
   if (!workspace) {
     return (
       <ProtectedLayout>
@@ -49,12 +59,33 @@ export const WorkspaceDetail = () => {
     );
   }
 
-  const stats = [
-    { label: 'Projects', value: '0', icon: FolderIcon, color: 'bg-blue-500' },
-    { label: 'Tasks', value: '0', icon: ClipboardDocumentListIcon, color: 'bg-green-500' },
-    { label: 'Members', value: members.length, icon: UsersIcon, color: 'bg-purple-500' },
-    { label: 'Completed', value: '0', icon: ChartBarIcon, color: 'bg-orange-500' },
-  ];
+const stats = [
+  { 
+    label: 'Projects', 
+    value: projects.length, 
+    icon: FolderIcon, 
+    color: 'bg-blue-500',
+    onClick: () => navigate(`/workspaces/${id}/projects`),
+  },
+  { 
+    label: 'Tasks', 
+    value: projects.reduce((sum, p) => sum + (parseInt(p.task_count) || 0), 0), 
+    icon: ClipboardDocumentListIcon, 
+    color: 'bg-green-500' 
+  },
+  { 
+    label: 'Members', 
+    value: members.length, 
+    icon: UsersIcon, 
+    color: 'bg-purple-500' 
+  },
+  { 
+    label: 'Completed', 
+    value: '0', 
+    icon: ChartBarIcon, 
+    color: 'bg-orange-500' 
+  },
+];
 
   return (
     <ProtectedLayout>
@@ -78,9 +109,9 @@ export const WorkspaceDetail = () => {
             >
               Settings
             </Button>
-            <Button onClick={() => navigate(`/workspaces/${id}/projects`)}>
-              View Projects
-            </Button>
+           <Button onClick={() => navigate(`/workspaces/${id}/projects`)}>
+  View Projects
+</Button>
           </div>
         </div>
 

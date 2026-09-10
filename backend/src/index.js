@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth.routes');
 const workspaceRoutes = require('./routes/workspace.routes');
+const projectRoutes = require('./routes/project.routes');
 const { apiRateLimiter } = require('./middleware/rateLimit.middleware');
 
 const app = express();
@@ -40,6 +41,7 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', workspaceRoutes);
+app.use('/api/projects', projectRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -70,5 +72,6 @@ app.listen(PORT, () => {
   console.log(`📝 Health check: http://localhost:${PORT}/health`);
   console.log(`🔐 Auth routes: http://localhost:${PORT}/api/auth`);
   console.log(`🏢 Workspace routes: http://localhost:${PORT}/api/workspaces`);
+  console.log(`📁 Project routes: http://localhost:${PORT}/api/projects`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
