@@ -6,6 +6,7 @@ const compression = require('compression');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth.routes');
+const workspaceRoutes = require('./routes/workspace.routes');
 const { apiRateLimiter } = require('./middleware/rateLimit.middleware');
 
 const app = express();
@@ -25,7 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 // Rate limiting
 app.use('/api', apiRateLimiter);
 
-// Health check route
+// Health check
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
@@ -38,6 +39,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/workspaces', workspaceRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -48,7 +50,7 @@ app.use((req, res) => {
   });
 });
 
-// Error handling middleware
+// Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   
@@ -67,5 +69,6 @@ app.listen(PORT, () => {
   console.log(`🚀 TaskFlow backend running on http://localhost:${PORT}`);
   console.log(`📝 Health check: http://localhost:${PORT}/health`);
   console.log(`🔐 Auth routes: http://localhost:${PORT}/api/auth`);
+  console.log(`🏢 Workspace routes: http://localhost:${PORT}/api/workspaces`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

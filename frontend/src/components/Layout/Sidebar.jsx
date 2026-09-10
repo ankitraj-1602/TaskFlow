@@ -7,10 +7,12 @@ import {
   Cog6ToothIcon,
   FolderIcon,
   CalendarIcon,
+  Squares2X2Icon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+  { name: 'Workspaces', href: '/workspaces', icon: Squares2X2Icon },
   { name: 'Projects', href: '/projects', icon: FolderIcon },
   { name: 'Tasks', href: '/tasks', icon: ClipboardDocumentListIcon },
   { name: 'Team', href: '/team', icon: UsersIcon },

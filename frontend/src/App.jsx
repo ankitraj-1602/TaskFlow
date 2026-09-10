@@ -6,6 +6,9 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import { Profile } from './pages/Profile';
+import { Workspaces } from './pages/Workspaces';
+import { WorkspaceDetail } from './pages/WorkspaceDetail';
+import { WorkspaceSettings } from './pages/WorkspaceSettings';
 
 function App() {
   const { loadUser, isAuthenticated } = useAuthStore();
@@ -13,9 +16,7 @@ function App() {
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
     if (accessToken && !isAuthenticated) {
-      loadUser().catch(() => {
-        // Silent fail - user will be redirected to login
-      });
+      loadUser().catch(() => {});
     }
   }, []);
 
@@ -37,7 +38,9 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
-        {/* Add more protected routes here */}
+        <Route path="/workspaces" element={<Workspaces />} />
+        <Route path="/workspaces/:id" element={<WorkspaceDetail />} />
+        <Route path="/workspaces/:id/settings" element={<WorkspaceSettings />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
