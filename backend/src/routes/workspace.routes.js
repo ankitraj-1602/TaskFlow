@@ -63,4 +63,36 @@ router.post(
 );
 router.get('/:workspaceId/projects', ProjectController.getWorkspaceProjects);
 
+
+// Tasks within project (nested in workspace)
+const TaskController = require('../controllers/task.controller');
+const taskValidationSchemas = {
+  createTask: Joi.object({
+    title: Joi.string().min(1).max(200).required(),
+    description: Joi.string().max(5000).optional(),
+    status: Joi.string().valid('TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED').optional(),
+    priority: Joi.string().valid('LOW', 'MEDIUM', 'HIGH', 'URGENT').optional(),
+    dueDate: Joi.date().iso().allow(null).optional(),
+    storyPoints: Joi.number().integer().min(0).max(100).allow(null).optional(),
+    assigneeId: Joi.string().uuid().allow(null).optional(),
+    metadata: Joi.object().optional(),
+  }),
+};
+
+router.post(
+  '/:workspaceId/projects/:projectId/tasks',
+  validate(taskValidationSchemas.createTask),
+  TaskController.createTask
+);
+
+router.get(
+  '/:workspaceId/projects/:projectId/tasks',
+  TaskController.getProjectTasks
+);
+
+router.get(
+  '/:workspaceId/projects/:projectId/tasks/stats',
+  TaskController.getTaskStats
+);
+
 module.exports = router;

@@ -8,12 +8,12 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth.routes');
 const workspaceRoutes = require('./routes/workspace.routes');
 const projectRoutes = require('./routes/project.routes');
+const taskRoutes = require('./routes/task.routes');
 const { apiRateLimiter } = require('./middleware/rateLimit.middleware');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(helmet());
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
@@ -21,13 +21,11 @@ app.use(cors({
 }));
 app.use(compression());
 app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Rate limiting
 app.use('/api', apiRateLimiter);
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
@@ -38,12 +36,11 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', workspaceRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api', taskRoutes);
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -52,13 +49,10 @@ app.use((req, res) => {
   });
 });
 
-// Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  
   const status = err.status || 500;
   const message = err.message || 'Internal Server Error';
-  
   res.status(status).json({
     success: false,
     message,
@@ -69,9 +63,9 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 TaskFlow backend running on http://localhost:${PORT}`);
-  console.log(`📝 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔐 Auth routes: http://localhost:${PORT}/api/auth`);
-  console.log(`🏢 Workspace routes: http://localhost:${PORT}/api/workspaces`);
-  console.log(`📁 Project routes: http://localhost:${PORT}/api/projects`);
+  console.log(`🔐 Auth: /api/auth`);
+  console.log(`🏢 Workspaces: /api/workspaces`);
+  console.log(`📁 Projects: /api/projects`);
+  console.log(`✅ Tasks: /api/projects/:id/tasks`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

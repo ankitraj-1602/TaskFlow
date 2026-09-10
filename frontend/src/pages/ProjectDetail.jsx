@@ -102,6 +102,10 @@ export const ProjectDetail = () => {
               <ViewColumnsIcon className="h-5 w-5 mr-2" />
               Open Board
             </Button>
+            <Button onClick={() => navigate(`/workspaces/${workspaceId}/projects/${projectId}/tasks`)}>
+  <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
+  View Tasks
+</Button>
           </div>
         </div>
 

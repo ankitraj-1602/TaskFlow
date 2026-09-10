@@ -8,13 +8,14 @@ import {
   FolderIcon,
   CalendarIcon,
   Squares2X2Icon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+  { name: 'My Tasks', href: '/my-tasks', icon: CheckCircleIcon },
   { name: 'Workspaces', href: '/workspaces', icon: Squares2X2Icon },
   { name: 'Projects', href: '/projects', icon: FolderIcon },
-  { name: 'Tasks', href: '/tasks', icon: ClipboardDocumentListIcon },
   { name: 'Team', href: '/team', icon: UsersIcon },
   { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
