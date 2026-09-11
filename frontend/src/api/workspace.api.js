@@ -36,4 +36,12 @@ export const workspaceApi = {
   updateMemberRole: (workspaceId, memberId, role) => {
     return apiClient.patch(`/workspaces/${workspaceId}/members/${memberId}/role`, { role }).then(res => res.data.data);
   },
+
+  getPendingInvitations: (workspaceId) => {
+  return apiClient.get(`/workspaces/${workspaceId}/invitations`).then(res => res.data.data);
+},
+
+cancelInvitation: (workspaceId, invitationId) => {
+  return apiClient.delete(`/workspaces/${workspaceId}/invitations/${invitationId}`).then(res => res.data.data);
+},
 };

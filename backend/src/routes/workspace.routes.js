@@ -169,4 +169,19 @@ router.get(
   TaskController.getTaskStats
 );
 
+// Pending invitations
+router.get(
+  '/:id/invitations',
+  requireWorkspaceMember,
+  requireWorkspaceRole('ADMIN', 'OWNER'),
+  WorkspaceController.getPendingInvitations
+);
+
+router.delete(
+  '/:id/invitations/:invitationId',
+  requireWorkspaceMember,
+  requireWorkspaceRole('ADMIN', 'OWNER'),
+  WorkspaceController.cancelInvitation
+);
+
 module.exports = router;

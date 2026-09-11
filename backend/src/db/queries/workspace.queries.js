@@ -134,16 +134,35 @@ class WorkspaceQueries {
     return result.rows[0]?.role || null;
   }
 
-  static async updateMemberRole(workspaceId, userId, role) {
-    const query = `
-      UPDATE workspace_members 
-      SET role = $1 
-      WHERE workspace_id = $2 AND user_id = $3
-      RETURNING id, workspace_id, user_id, role, joined_at
-    `;
-    const result = await QueryHelper.query(query, [role, workspaceId, userId]);
-    return result.rows[0] || null;
-  }
+static async updateMemberRole(workspaceId, memberId, role) {
+  // memberId is workspace_members.id
+  const query = `
+    UPDATE workspace_members 
+    SET role = $1 
+    WHERE id = $2 AND workspace_id = $3
+    RETURNING id, workspace_id, user_id, role, joined_at
+  `;
+  const result = await QueryHelper.query(query, [role, memberId, workspaceId]);
+  return result.rows[0] || null;
+}
+static async removeMemberById(workspaceId, memberId) {
+  const query = `
+    DELETE FROM workspace_members 
+    WHERE id = $1 AND workspace_id = $2
+    RETURNING id
+  `;
+  const result = await QueryHelper.query(query, [memberId, workspaceId]);
+  return result.rows[0] || null;
+}
+static async findMemberById(workspaceId, memberId) {
+  const query = `
+    SELECT wm.id, wm.role, wm.user_id
+    FROM workspace_members wm
+    WHERE wm.id = $1 AND wm.workspace_id = $2
+  `;
+  const result = await QueryHelper.query(query, [memberId, workspaceId]);
+  return result.rows[0] || null;
+}
 
   static async isMember(workspaceId, userId) {
     const query = `

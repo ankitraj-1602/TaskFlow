@@ -117,6 +117,23 @@ const cleanupExpiredTokens = async () => {
   );
   console.log('🧹 Cleaned up expired tokens');
 };
+const createWorkspaceInvitationToken = async (invitationData) => {
+  const InvitationQueries = require('../db/queries/invitation.queries');
+  
+  const token = generateSecureToken();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  const invitation = await InvitationQueries.create({
+    token,
+    email: invitationData.email,
+    role: invitationData.role,
+    workspaceId: invitationData.workspaceId,
+    invitedBy: invitationData.invitedBy,
+    expiresAt,
+  });
+
+  return { token, invitation };
+};
 
 module.exports = {
   generateSecureToken,
@@ -126,4 +143,5 @@ module.exports = {
   verifyPasswordResetToken,
   markPasswordResetTokenUsed,
   cleanupExpiredTokens,
+  createWorkspaceInvitationToken,  
 };

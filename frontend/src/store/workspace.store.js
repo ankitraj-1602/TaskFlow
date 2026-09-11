@@ -6,6 +6,7 @@ export const useWorkspaceStore = create((set, get) => ({
   currentWorkspace: null,
   members: [],
   isLoading: false,
+  pendingInvitations: [],
 
   loadWorkspaces: async () => {
     set({ isLoading: true });
@@ -126,6 +127,32 @@ export const useWorkspaceStore = create((set, get) => ({
       throw error;
     }
   },
+  loadPendingInvitations: async (workspaceId) => {
+  set({ isLoading: true });
+  try {
+    const invitations = await workspaceApi.getPendingInvitations(workspaceId);
+    set({ pendingInvitations: invitations, isLoading: false });
+    return invitations;
+  } catch (error) {
+    set({ isLoading: false });
+    throw error;
+  }
+},
+
+cancelInvitation: async (workspaceId, invitationId) => {
+  set({ isLoading: true });
+  try {
+    await workspaceApi.cancelInvitation(workspaceId, invitationId);
+    set((state) => ({
+      pendingInvitations: state.pendingInvitations.filter(i => i.id !== invitationId),
+      isLoading: false,
+    }));
+    return true;
+  } catch (error) {
+    set({ isLoading: false });
+    throw error;
+  }
+},
 
   clearWorkspace: () => {
     set({

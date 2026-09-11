@@ -9,11 +9,24 @@ const ROLES = {
 };
 
 /**
- * Hook to check permissions based on the current workspace role
+ * Hook to check permissions based on the current workspace role.
+ * Accepts an optional override role (useful when the workspace
+ * detail page passes role directly instead of relying on store).
  */
-export const usePermission = () => {
-  const { currentWorkspace } = useWorkspaceStore();
-  const role = currentWorkspace?.userRole || currentWorkspace?.member_role || 'VIEWER';
+export const usePermission = (overrideRole) => {
+  const { currentWorkspace, workspaces } = useWorkspaceStore();
+
+  // Try multiple sources for the role
+  const role =
+    overrideRole ||
+    currentWorkspace?.userRole ||
+    currentWorkspace?.member_role ||
+    currentWorkspace?.role ||
+    // Fallback: find the workspace via some other means
+    'VIEWER';
+
+  // Debug log (remove later)
+  // console.log('[usePermission] role:', role, 'currentWorkspace:', currentWorkspace);
 
   const hasRole = (...allowedRoles) => allowedRoles.includes(role);
 
@@ -25,7 +38,6 @@ export const usePermission = () => {
     role,
     hasRole,
     isAtLeast,
-    // Convenient shortcuts
     isOwner: role === 'OWNER',
     isAdmin: role === 'OWNER' || role === 'ADMIN',
     isManager: role === 'OWNER' || role === 'ADMIN' || role === 'MANAGER',

@@ -17,6 +17,8 @@ import { MyTasks } from './pages/MyTasks';
 import { VerifyEmail } from './pages/VerifyEmail';  // ⬅️ ADD THIS LINE
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
+import { AcceptInvitation } from './pages/AcceptInvitation';
+
 
 function App() {
   const { loadUser, isAuthenticated } = useAuthStore();
@@ -63,6 +65,9 @@ function App() {
         <Route path="/workspaces/:workspaceId/projects/:projectId/tasks" element={<Tasks />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 <Route path="/reset-password" element={<ResetPassword />} />
+
+<Route path="/invitations/:token" element={<AcceptInvitation />} />
+
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
