@@ -85,15 +85,28 @@ class TaskService {
   }
 
  async updateTask(taskId, userId, data) {
-  const task = await TaskQueries.findById(taskId);
+ const task = await TaskQueries.findById(taskId);
   if (!task) {
     throw new Error('Task not found');
   }
 
   const project = await ProjectQueries.findById(task.project_id);
-  const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
-  if (!hasAccess) {
+  const workspaceRole = await this.getWorkspaceRole(project.workspace_id, userId);
+
+  if (!workspaceRole) {
     throw new Error('You do not have access to this task');
+  }
+
+  // RBAC: MEMBER can only edit tasks they created or are assigned to
+  const isOwnTask = 
+    task.created_by_id === userId || 
+    task.assignee_user_id === userId;
+
+  const canEditAnyTask = ['MANAGER', 'ADMIN', 'OWNER'].includes(workspaceRole);
+  const canEditOwnTask = workspaceRole === 'MEMBER' && isOwnTask;
+
+  if (!canEditAnyTask && !canEditOwnTask) {
+    throw new Error('You do not have permission to edit this task');
   }
 
   const updateData = {};
@@ -251,6 +264,7 @@ class TaskService {
     const tasks = await TaskQueries.getMyTasks(userId, filters);
     return tasks.map(this.enrichTask);
   }
+  
 
   // Helper methods
 enrichTask(task) {
@@ -300,6 +314,12 @@ enrichTask(task) {
     const members = await WorkspaceQueries.getMembers(workspaceId);
     return members.find(m => m.user_id === userId);
   }
+
+  async getWorkspaceRole(workspaceId, userId) {
+  const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
+  if (isOwner) return 'OWNER';
+  return WorkspaceQueries.getUserRole(workspaceId, userId);
+}
 }
 
 module.exports = TaskService;

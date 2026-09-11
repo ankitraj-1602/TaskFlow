@@ -1,17 +1,12 @@
-const router = require('express').Router({ mergeParams: true });
+const router = require('express').Router();
 const ProjectController = require('../controllers/project.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 const { validate } = require('../middleware/validation.middleware');
+const {
+  requireProjectAccess,
+  requireProjectRole,
+} = require('../middleware/rbac.middleware');
 const Joi = require('joi');
-
-// Validation schemas
-const createProjectSchema = Joi.object({
-  name: Joi.string().min(2).max(100).required(),
-  description: Joi.string().max(1000).optional(),
-  status: Joi.string().valid('PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED').optional(),
-  startDate: Joi.date().iso().optional(),
-  dueDate: Joi.date().iso().optional(),
-});
 
 const updateProjectSchema = Joi.object({
   name: Joi.string().min(2).max(100).optional(),
@@ -28,41 +23,71 @@ const addMemberSchema = Joi.object({
   role: Joi.string().valid('MANAGER', 'MEMBER', 'VIEWER').default('MEMBER'),
 });
 
-// All routes require authentication
 router.use(authenticate);
 
-// Project CRUD
-router.post(
-  '/',
-  validate(createProjectSchema),
-  ProjectController.createProject
+// ─── Get project (any member) ───────────────────────
+router.get(
+  '/:id',
+  requireProjectAccess,
+  ProjectController.getProject
 );
 
-router.get('/', ProjectController.getWorkspaceProjects);
-
-router.get('/:id', ProjectController.getProject);
-
+// ─── Update project (MANAGER, ADMIN, OWNER) ─────────
 router.patch(
   '/:id',
+  requireProjectAccess,
+  requireProjectRole('MANAGER', 'ADMIN', 'OWNER'),
   validate(updateProjectSchema),
   ProjectController.updateProject
 );
 
-router.delete('/:id', ProjectController.deleteProject);
+// ─── Delete project (ADMIN, OWNER) ──────────────────
+router.delete(
+  '/:id',
+  requireProjectAccess,
+  requireProjectRole('ADMIN', 'OWNER'),
+  ProjectController.deleteProject
+);
 
-// Archive/Unarchive
-router.patch('/:id/archive', ProjectController.archiveProject);
-router.patch('/:id/unarchive', ProjectController.unarchiveProject);
+// ─── Archive/unarchive (MANAGER, ADMIN, OWNER) ──────
+router.patch(
+  '/:id/archive',
+  requireProjectAccess,
+  requireProjectRole('MANAGER', 'ADMIN', 'OWNER'),
+  ProjectController.archiveProject
+);
 
-// Member management
-router.get('/:id/members', ProjectController.getProjectMembers);
+router.patch(
+  '/:id/unarchive',
+  requireProjectAccess,
+  requireProjectRole('MANAGER', 'ADMIN', 'OWNER'),
+  ProjectController.unarchiveProject
+);
 
+// ─── Member management ──────────────────────────────
+
+// Get members (any)
+router.get(
+  '/:id/members',
+  requireProjectAccess,
+  ProjectController.getProjectMembers
+);
+
+// Add member (MANAGER, ADMIN, OWNER)
 router.post(
   '/:id/members',
+  requireProjectAccess,
+  requireProjectRole('MANAGER', 'ADMIN', 'OWNER'),
   validate(addMemberSchema),
   ProjectController.addProjectMember
 );
 
-router.delete('/:id/members/:memberId', ProjectController.removeProjectMember);
+// Remove member (ADMIN, OWNER)
+router.delete(
+  '/:id/members/:memberId',
+  requireProjectAccess,
+  requireProjectRole('ADMIN', 'OWNER'),
+  ProjectController.removeProjectMember
+);
 
 module.exports = router;

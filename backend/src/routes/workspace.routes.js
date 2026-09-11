@@ -1,11 +1,16 @@
 const router = require('express').Router();
 const WorkspaceController = require('../controllers/workspace.controller');
 const ProjectController = require('../controllers/project.controller');
+const TaskController = require('../controllers/task.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 const { validate } = require('../middleware/validation.middleware');
+const {
+  requireWorkspaceMember,
+  requireWorkspaceRole,
+} = require('../middleware/rbac.middleware');
 const Joi = require('joi');
 
-// Validation schemas
+// Validation schemas (unchanged)
 const createWorkspaceSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   description: Joi.string().max(500).optional(),
@@ -35,63 +40,132 @@ const createProjectSchema = Joi.object({
   dueDate: Joi.date().iso().optional(),
 });
 
+const createTaskSchema = Joi.object({
+  title: Joi.string().min(1).max(200).required(),
+  description: Joi.string().max(5000).optional(),
+  status: Joi.string().valid('TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED').optional(),
+  priority: Joi.string().valid('LOW', 'MEDIUM', 'HIGH', 'URGENT').optional(),
+  dueDate: Joi.date().iso().allow(null).optional(),
+  storyPoints: Joi.number().integer().min(0).max(100).allow(null).optional(),
+  assigneeId: Joi.string().uuid().allow(null).optional(),
+  metadata: Joi.object().optional(),
+});
+
+// ═══════════════════════════════════════════════════
 // All routes require authentication
+// ═══════════════════════════════════════════════════
 router.use(authenticate);
 
-// Workspace CRUD
-router.post('/', validate(createWorkspaceSchema), WorkspaceController.createWorkspace);
-router.get('/', WorkspaceController.getUserWorkspaces);
-router.get('/:id', WorkspaceController.getWorkspace);
-router.patch('/:id', validate(updateWorkspaceSchema), WorkspaceController.updateWorkspace);
-router.delete('/:id', WorkspaceController.deleteWorkspace);
+// ─── Workspace CRUD ─────────────────────────────────
 
-// Member management
-router.post('/:id/members', validate(addMemberSchema), WorkspaceController.addMember);
-router.get('/:id/members', WorkspaceController.getWorkspaceMembers);
-router.delete('/:id/members/:memberId', WorkspaceController.removeMember);
+// Create: any authenticated user
+router.post('/', validate(createWorkspaceSchema), WorkspaceController.createWorkspace);
+
+// List user's workspaces: any authenticated user
+router.get('/', WorkspaceController.getUserWorkspaces);
+
+// ⬇️ From this point, routes need workspace membership
+// We use requireWorkspaceMember which reads :id from params
+
+// Get specific workspace
+router.get(
+  '/:id',
+  requireWorkspaceMember,
+  WorkspaceController.getWorkspace
+);
+
+// Update workspace (ADMIN or OWNER)
+router.patch(
+  '/:id',
+  requireWorkspaceMember,
+  requireWorkspaceRole('ADMIN', 'OWNER'),
+  validate(updateWorkspaceSchema),
+  WorkspaceController.updateWorkspace
+);
+
+// Delete workspace (OWNER only)
+router.delete(
+  '/:id',
+  requireWorkspaceMember,
+  requireWorkspaceRole('OWNER'),
+  WorkspaceController.deleteWorkspace
+);
+
+// ─── Member Management ──────────────────────────────
+
+// Add member (ADMIN or OWNER)
+router.post(
+  '/:id/members',
+  requireWorkspaceMember,
+  requireWorkspaceRole('ADMIN', 'OWNER'),
+  validate(addMemberSchema),
+  WorkspaceController.addMember
+);
+
+// Get members (any member)
+router.get(
+  '/:id/members',
+  requireWorkspaceMember,
+  WorkspaceController.getWorkspaceMembers
+);
+
+// Remove member (ADMIN or OWNER)
+router.delete(
+  '/:id/members/:memberId',
+  requireWorkspaceMember,
+  requireWorkspaceRole('ADMIN', 'OWNER'),
+  WorkspaceController.removeMember
+);
+
+// Update member role (OWNER only)
 router.patch(
   '/:id/members/:memberId/role',
+  requireWorkspaceMember,
+  requireWorkspaceRole('OWNER'),
   validate(updateMemberRoleSchema),
   WorkspaceController.updateMemberRole
 );
 
-// Projects within workspace
+// ─── Projects within Workspace ──────────────────────
+
+// Create project (MANAGER, ADMIN, OWNER)
 router.post(
   '/:workspaceId/projects',
+  requireWorkspaceMember,
+  requireWorkspaceRole('MANAGER', 'ADMIN', 'OWNER'),
   validate(createProjectSchema),
   ProjectController.createProject
 );
-router.get('/:workspaceId/projects', ProjectController.getWorkspaceProjects);
 
+// List projects (any member)
+router.get(
+  '/:workspaceId/projects',
+  requireWorkspaceMember,
+  ProjectController.getWorkspaceProjects
+);
 
-// Tasks within project (nested in workspace)
-const TaskController = require('../controllers/task.controller');
-const taskValidationSchemas = {
-  createTask: Joi.object({
-    title: Joi.string().min(1).max(200).required(),
-    description: Joi.string().max(5000).optional(),
-    status: Joi.string().valid('TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED').optional(),
-    priority: Joi.string().valid('LOW', 'MEDIUM', 'HIGH', 'URGENT').optional(),
-    dueDate: Joi.date().iso().allow(null).optional(),
-    storyPoints: Joi.number().integer().min(0).max(100).allow(null).optional(),
-    assigneeId: Joi.string().uuid().allow(null).optional(),
-    metadata: Joi.object().optional(),
-  }),
-};
+// ─── Tasks within Project ───────────────────────────
 
+// Create task (MEMBER, MANAGER, ADMIN, OWNER)
 router.post(
   '/:workspaceId/projects/:projectId/tasks',
-  validate(taskValidationSchemas.createTask),
+  requireWorkspaceMember,
+  requireWorkspaceRole('MEMBER', 'MANAGER', 'ADMIN', 'OWNER'),
+  validate(createTaskSchema),
   TaskController.createTask
 );
 
+// List tasks (any member including VIEWER)
 router.get(
   '/:workspaceId/projects/:projectId/tasks',
+  requireWorkspaceMember,
   TaskController.getProjectTasks
 );
 
+// Task stats (any member)
 router.get(
   '/:workspaceId/projects/:projectId/tasks/stats',
+  requireWorkspaceMember,
   TaskController.getTaskStats
 );
 

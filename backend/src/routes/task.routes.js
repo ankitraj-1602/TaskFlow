@@ -2,19 +2,11 @@ const router = require('express').Router();
 const TaskController = require('../controllers/task.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 const { validate } = require('../middleware/validation.middleware');
+const {
+  requireProjectAccess,
+  requireProjectRole,
+} = require('../middleware/rbac.middleware');
 const Joi = require('joi');
-
-// Validation schemas
-const createTaskSchema = Joi.object({
-  title: Joi.string().min(1).max(200).required(),
-  description: Joi.string().max(5000).optional(),
-  status: Joi.string().valid('TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED').optional(),
-  priority: Joi.string().valid('LOW', 'MEDIUM', 'HIGH', 'URGENT').optional(),
-  dueDate: Joi.date().iso().allow(null).optional(),
-  storyPoints: Joi.number().integer().min(0).max(100).allow(null).optional(),
-  assigneeId: Joi.string().uuid().allow(null).optional(),
-  metadata: Joi.object().optional(),
-});
 
 const updateTaskSchema = Joi.object({
   title: Joi.string().min(1).max(200).optional(),
@@ -37,46 +29,62 @@ const reorderSchema = Joi.object({
   taskIds: Joi.array().items(Joi.string().uuid()).required(),
 });
 
-// All routes require authentication
 router.use(authenticate);
 
-// My tasks
+// My tasks (any authenticated user)
 router.get('/my-tasks', TaskController.getMyTasks);
 
-// Tasks within project
-router.post(
-  '/projects/:projectId/tasks',
-  validate(createTaskSchema),
-  TaskController.createTask
+// Get single task (any project member)
+router.get(
+  '/tasks/:id',
+  TaskController.getTask
 );
 
-router.get('/projects/:projectId/tasks', TaskController.getProjectTasks);
-
-router.get('/projects/:projectId/tasks/stats', TaskController.getTaskStats);
-
-router.post(
-  '/projects/:projectId/tasks/reorder',
-  validate(reorderSchema),
-  TaskController.reorderTasks
+// Update task (MEMBER+)
+router.patch(
+  '/tasks/:id',
+  validate(updateTaskSchema),
+  TaskController.updateTask
 );
 
-// Individual task
-router.get('/tasks/:id', TaskController.getTask);
-
-router.patch('/tasks/:id', validate(updateTaskSchema), TaskController.updateTask);
-
+// Update status (MEMBER+)
 router.patch(
   '/tasks/:id/status',
   validate(updateStatusSchema),
   TaskController.updateTaskStatus
 );
 
-router.patch('/tasks/:id/archive', TaskController.archiveTask);
+// Reorder tasks (MEMBER+)
+router.post(
+  '/projects/:projectId/tasks/reorder',
+  requireProjectAccess,
+  requireProjectRole('MEMBER', 'MANAGER', 'ADMIN', 'OWNER'),
+  validate(reorderSchema),
+  TaskController.reorderTasks
+);
 
-router.patch('/tasks/:id/unarchive', TaskController.unarchiveTask);
+// Archive task (MANAGER+)
+router.patch(
+  '/tasks/:id/archive',
+  TaskController.archiveTask
+);
 
-router.post('/tasks/:id/duplicate', TaskController.duplicateTask);
+// Unarchive task (MANAGER+)
+router.patch(
+  '/tasks/:id/unarchive',
+  TaskController.unarchiveTask
+);
 
-router.delete('/tasks/:id', TaskController.deleteTask);
+// Duplicate task (MEMBER+)
+router.post(
+  '/tasks/:id/duplicate',
+  TaskController.duplicateTask
+);
+
+// Delete task (MANAGER+)
+router.delete(
+  '/tasks/:id',
+  TaskController.deleteTask
+);
 
 module.exports = router;
