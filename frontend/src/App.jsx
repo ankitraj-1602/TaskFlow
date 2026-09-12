@@ -19,6 +19,7 @@ import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { AcceptInvitation } from './pages/AcceptInvitation';
 import { Settings } from './pages/Settings';
+import { KanbanBoard } from './pages/KanbanBoard';
 
 
 function App() {
@@ -72,6 +73,10 @@ function App() {
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
         <Route path="/settings" element={<Settings />} />
+        <Route
+  path="/workspaces/:workspaceId/projects/:projectId/board"
+  element={<KanbanBoard />}
+/>
       </Routes>
     </Router>
   );

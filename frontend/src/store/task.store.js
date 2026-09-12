@@ -77,27 +77,46 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-  updateTaskStatus: async (taskId, status, position) => {
-    // Optimistic update
-    const previousTasks = get().tasks;
+updateTaskStatus: async (taskId, status, position) => {
+  const previousTasks = get().tasks;
+  const existingTask = previousTasks.find((t) => t.id === taskId);
+
+  if (!existingTask) {
+    throw new Error('Task not found in store');
+  }
+
+  // ─── Optimistic update ─────────────────────────────
+  set((state) => ({
+    tasks: state.tasks.map((t) =>
+      t.id === taskId ? { ...t, status, position: position ?? t.position } : t
+    ),
+  }));
+
+  try {
+    const updated = await taskApi.updateStatus(taskId, { status, position });
+
+    // ─── Merge: keep existing fields, overlay only what
+    //     the backend explicitly returned ───────────────
     set((state) => ({
-      tasks: state.tasks.map(t => 
-        t.id === taskId ? { ...t, status, position: position ?? t.position } : t
-      ),
+      tasks: state.tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        return {
+          ...t, // preserve existing full task
+          // overlay only safe fields from backend
+          status: updated.status ?? t.status,
+          position: updated.position ?? t.position,
+          updatedAt: updated.updatedAt || updated.updated_at || t.updatedAt,
+          completedAt: updated.completedAt ?? updated.completed_at ?? t.completedAt,
+        };
+      }),
     }));
 
-    try {
-      const task = await taskApi.updateStatus(taskId, { status, position });
-      set((state) => ({
-        tasks: state.tasks.map(t => t.id === taskId ? task : t),
-      }));
-      return task;
-    } catch (error) {
-      // Revert on error
-      set({ tasks: previousTasks });
-      throw error;
-    }
-  },
+    return updated;
+  } catch (error) {
+    set({ tasks: previousTasks });
+    throw error;
+  }
+},
 
   reorderTasks: async (projectId, status, taskIds) => {
     try {
