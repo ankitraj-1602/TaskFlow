@@ -6,6 +6,7 @@ const compression = require('compression');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth.routes');
+const commentRoutes = require('./routes/comment.routes');
 const workspaceRoutes = require('./routes/workspace.routes');
 const projectRoutes = require('./routes/project.routes');
 const taskRoutes = require('./routes/task.routes');
@@ -42,6 +43,7 @@ app.use('/api/workspaces', workspaceRoutes);
 app.use('/api', taskRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/invitations', invitationRoutes); 
+app.use('/api', commentRoutes);  
 
 app.use((req, res) => {
   res.status(404).json({

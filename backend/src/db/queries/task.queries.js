@@ -163,18 +163,18 @@ static async findByProject(projectId, filters = {}) {
   }
 
   const query = `
-    SELECT t.*,
-      u.name as created_by_name,
-      a.name as assignee_name, a.profile_picture as assignee_picture,
-      wm.user_id as assignee_user_id,
-      0 as comment_count,
-      0 as attachment_count
-    FROM tasks t
-    LEFT JOIN users u ON t.created_by_id = u.id
-    LEFT JOIN workspace_members wm ON t.assignee_id = wm.id
-    LEFT JOIN users a ON wm.user_id = a.id
-    WHERE ${conditions.join(' AND ')}
-    ORDER BY ${orderBy}${limitClause}
+   SELECT t.*,
+  u.name as created_by_name,
+  a.name as assignee_name, a.profile_picture as assignee_picture,
+  wm.user_id as assignee_user_id,
+  (SELECT COUNT(*) FROM comments WHERE task_id = t.id) as comment_count,
+  (SELECT COUNT(*) FROM attachments WHERE task_id = t.id) as attachment_count
+FROM tasks t
+LEFT JOIN users u ON t.created_by_id = u.id
+LEFT JOIN workspace_members wm ON t.assignee_id = wm.id
+LEFT JOIN users a ON wm.user_id = a.id
+WHERE ${conditions.join(' AND ')}
+ORDER BY ${orderBy}${limitClause}
   `;
 
   const result = await QueryHelper.query(query, values);
