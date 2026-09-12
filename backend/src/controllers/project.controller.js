@@ -134,24 +134,23 @@ class ProjectController {
     }
   }
 
-  static async addProjectMember(req, res) {
-    try {
-      const { id } = req.params;
-      const userId = req.user.userId;
-      const { userId: memberUserId, role } = req.body;
+static async addProjectMember(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+    const { email, userId: memberUserId, role } = req.body;
 
-      const member = await projectService.addProjectMember(
-        id,
-        userId,
-        memberUserId,
-        role
-      );
+    const member = await projectService.addProjectMember(id, userId, {
+      email,
+      userId: memberUserId,
+      role,
+    });
 
-      successResponse(res, member, 'Member added to project successfully', 201);
-    } catch (error) {
-      errorResponse(res, error.message, 400);
-    }
+    successResponse(res, member, 'Member added to project successfully', 201);
+  } catch (error) {
+    errorResponse(res, error.message, 400);
   }
+}
 
   static async removeProjectMember(req, res) {
     try {
@@ -165,6 +164,17 @@ class ProjectController {
       errorResponse(res, error.message, 400);
     }
   }
+  static async getAvailableMembers(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+
+    const members = await projectService.getAvailableMembers(id, userId);
+    successResponse(res, members, 'Available members retrieved');
+  } catch (error) {
+    errorResponse(res, error.message, 403);
+  }
+}
 }
 
 module.exports = ProjectController;

@@ -19,9 +19,10 @@ const updateProjectSchema = Joi.object({
 });
 
 const addMemberSchema = Joi.object({
-  userId: Joi.string().uuid().required(),
+  email: Joi.string().email().optional(),
+  userId: Joi.string().uuid().optional(),
   role: Joi.string().valid('MANAGER', 'MEMBER', 'VIEWER').default('MEMBER'),
-});
+}).or('email', 'userId');  // ⬅️ require at least one
 
 router.use(authenticate);
 
@@ -88,6 +89,13 @@ router.delete(
   requireProjectAccess,
   requireProjectRole('ADMIN', 'OWNER'),
   ProjectController.removeProjectMember
+);
+
+router.get(
+  '/:id/available-members',
+  requireProjectAccess,
+  requireProjectRole('MANAGER', 'ADMIN', 'OWNER'),
+  ProjectController.getAvailableMembers
 );
 
 module.exports = router;

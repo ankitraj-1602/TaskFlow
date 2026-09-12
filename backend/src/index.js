@@ -39,8 +39,8 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', workspaceRoutes);
-app.use('/api/projects', projectRoutes);
 app.use('/api', taskRoutes);
+app.use('/api/projects', projectRoutes);
 app.use('/api/invitations', invitationRoutes); 
 
 app.use((req, res) => {

@@ -221,6 +221,26 @@ class ProjectQueries {
     const result = await QueryHelper.query(query, [projectId]);
     return parseInt(result.rows[0].count);
   }
+  static async findMemberById(projectId, memberId) {
+  const query = `
+    SELECT pm.id, pm.role, pm.workspace_member_id, wm.user_id
+    FROM project_members pm
+    JOIN workspace_members wm ON pm.workspace_member_id = wm.id
+    WHERE pm.id = $1 AND pm.project_id = $2
+  `;
+  const result = await QueryHelper.query(query, [memberId, projectId]);
+  return result.rows[0] || null;
+}
+
+static async removeMemberById(projectId, memberId) {
+  const query = `
+    DELETE FROM project_members 
+    WHERE id = $1 AND project_id = $2
+    RETURNING id
+  `;
+  const result = await QueryHelper.query(query, [memberId, projectId]);
+  return result.rows[0] || null;
+}
 }
 
 module.exports = ProjectQueries;

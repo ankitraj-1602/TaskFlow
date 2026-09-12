@@ -48,4 +48,16 @@ export const projectApi = {
   removeMember: (id, memberId) => {
     return apiClient.delete(`/projects/${id}/members/${memberId}`).then(res => res.data.data);
   },
+
+  getAvailableMembers: (projectId) => {
+  return apiClient.get(`/projects/${projectId}/available-members`).then(res => res.data.data);
+},
+
+addMember: (projectId, data) => {
+  return apiClient.post(`/projects/${projectId}/members`, data).then(res => res.data.data);
+},
+
+removeMember: (projectId, memberId) => {
+  return apiClient.delete(`/projects/${projectId}/members/${memberId}`).then(res => res.data.data);
+},
 };
