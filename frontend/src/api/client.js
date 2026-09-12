@@ -39,7 +39,7 @@ apiClient.interceptors.response.use(
 
         // Call refresh endpoint
         const response = await axios.post(
-          `${import.meta.env.VITE_API_URL}/api/auth/refresh-token`,
+          `${import.meta.env.VITE_API_URL}/auth/refresh-token`,
           { refreshToken }
         );
 
@@ -57,7 +57,7 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        // window.location.href = '/login';
+        window.location.href = '/login';
         return Promise.reject(refreshError);
       }
     }

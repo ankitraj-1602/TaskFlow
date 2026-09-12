@@ -40,7 +40,7 @@ const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   const handleRemove = async () => {
     try {
-      await removeMember(workspaceId, member.user_id);
+      await removeMember(workspaceId, member.id);
       toast.success('Member removed');
       setShowRemoveConfirm(false);
     } catch (error) {

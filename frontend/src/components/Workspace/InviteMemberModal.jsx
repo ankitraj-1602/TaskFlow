@@ -29,11 +29,15 @@ export const InviteMemberModal = ({ isOpen, onClose, workspaceId }) => {
   const onSubmit = async (data) => {
     try {
       const result = await addMember(workspaceId, data);
-      
-      if (result.type === 'added') {
+
+      // Show correct toast based on result type
+      if (result?.type === 'added') {
         toast.success(`${data.email} has been added to the workspace`);
-      } else if (result.type === 'invited') {
+      } else if (result?.type === 'invited') {
         toast.success(`Invitation sent to ${data.email}`);
+      } else {
+        // Fallback if backend didn't return a type
+        toast.success('Member added successfully');
       }
 
       reset();
@@ -47,7 +51,7 @@ export const InviteMemberModal = ({ isOpen, onClose, workspaceId }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="Invite Member" size="md">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <p className="text-sm text-gray-600">
-          If the user has an account, they'll be added immediately. 
+          If the user has an account, they'll be added immediately.
           Otherwise, they'll receive an email invitation.
         </p>
 

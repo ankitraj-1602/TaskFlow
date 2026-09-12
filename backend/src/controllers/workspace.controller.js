@@ -84,10 +84,13 @@ static async addMember(req, res) {
 
     const result = await workspaceService.addMember(id, userId, email, role);
 
+    // Return the FULL result including `type`
     if (result.type === 'added') {
-      return successResponse(res, result.member, 'Member added successfully', 201);
+      return successResponse(res, result, 'Member added successfully', 201);
+    } else if (result.type === 'invited') {
+      return successResponse(res, result, 'Invitation sent successfully', 201);
     } else {
-      return successResponse(res, result.invitation, 'Invitation sent successfully', 201);
+      return successResponse(res, result, 'Operation completed', 201);
     }
   } catch (error) {
     errorResponse(res, error.message, 400);

@@ -31,15 +31,14 @@ const onSubmit = async (data) => {
   try {
     await login(data.email, data.password);
     toast.success('Welcome back!');
-    
+
     // Check for pending invitation
     const pendingInvitation = localStorage.getItem('pendingInvitation');
     if (pendingInvitation) {
-      localStorage.removeItem('pendingInvitation');
       navigate(`/invitations/${pendingInvitation}`);
-      return;
+      return; // ⬅️ Don't go to /dashboard
     }
-    
+
     navigate('/dashboard');
   } catch (error) {
     toast.error(error.response?.data?.message || 'Login failed');

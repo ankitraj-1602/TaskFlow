@@ -12,6 +12,7 @@ import {
   FolderIcon,
   ClipboardDocumentListIcon,
   ChartBarIcon,
+  Cog6ToothIcon,       // ⬅️ ADD THIS
 } from '@heroicons/react/24/outline';
 
 const tabs = [
@@ -102,13 +103,23 @@ useEffect(() => {
           >
             <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
           </button>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900">{workspace.name}</h2>
-            <p className="text-gray-600">{workspace.description || 'No description'}</p>
-          </div>
-          <Button onClick={() => navigate(`/workspaces/${id}/projects`)}>
-            View Projects
-          </Button>
+        <div className="flex-1">
+  <h2 className="text-2xl font-bold text-gray-900">{workspace.name}</h2>
+  <p className="text-gray-600">{workspace.description || 'No description'}</p>
+</div>
+<div className="flex space-x-3">
+  <Button
+    variant="secondary"
+    onClick={() => navigate(`/workspaces/${id}/settings`)}
+  >
+    <Cog6ToothIcon className="h-5 w-5 mr-2" />
+    Settings
+  </Button>
+  <Button onClick={() => navigate(`/workspaces/${id}/projects`)}>
+    <FolderIcon className="h-5 w-5 mr-2" />
+    View Projects
+  </Button>
+</div>
         </div>
 
         {/* Tabs */}

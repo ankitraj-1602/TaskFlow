@@ -38,16 +38,24 @@ export const Register = () => {
     resolver: zodResolver(registerSchema),
   });
 
-  const onSubmit = async (data) => {
-    try {
-      const { confirmPassword, ...registerData } = data;
-      await registerUser(registerData);
-      toast.success('Account created successfully!');
-      navigate('/dashboard');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Registration failed');
+const onSubmit = async (data) => {
+  try {
+    const { confirmPassword, ...registerData } = data;
+    await registerUser(registerData);
+    toast.success('Account created successfully!');
+
+    // Check for pending invitation
+    const pendingInvitation = localStorage.getItem('pendingInvitation');
+    if (pendingInvitation) {
+      navigate(`/invitations/${pendingInvitation}`);
+      return;
     }
-  };
+
+    navigate('/dashboard');
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Registration failed');
+  }
+};
 
   return (
     <PublicLayout title="Create your account" subtitle="Start managing your projects with TaskFlow">
