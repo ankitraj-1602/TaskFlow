@@ -331,6 +331,31 @@ async resetPassword(token, newPassword) {
 
   return true;
 }
+async deleteAccount(userId, password) {
+  const user = await UserQueries.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const isPasswordValid = await comparePassword(password, user.password_hash);
+  if (!isPasswordValid) {
+    throw new Error('Password is incorrect');
+  }
+
+  // Soft delete — mark as deleted and clear tokens
+  await UserQueries.clearRefreshToken(userId);
+
+  const query = `
+    UPDATE users 
+    SET deleted_at = CURRENT_TIMESTAMP, email = CONCAT(email, '_deleted_', id)
+    WHERE id = $1
+    RETURNING id
+  `;
+  const QueryHelper = require('../db/queries/helper');
+  await QueryHelper.query(query, [userId]);
+
+  return true;
+}
 }
 
 

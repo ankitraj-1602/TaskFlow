@@ -171,6 +171,23 @@ static async verifyEmail(req, res) {
     errorResponse(res, error.message, 400);
   }
 }
+static async deleteAccount(req, res) {
+  try {
+    if (!req.user) {
+      return errorResponse(res, 'User not authenticated', 401);
+    }
+
+    const { password } = req.body;
+    if (!password) {
+      return errorResponse(res, 'Password is required', 400);
+    }
+
+    await userService.deleteAccount(req.user.userId, password);
+    successResponse(res, null, 'Account deleted successfully');
+  } catch (error) {
+    errorResponse(res, error.message, 400);
+  }
+}
 }
 
 module.exports = AuthController;

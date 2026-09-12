@@ -18,6 +18,7 @@ import { VerifyEmail } from './pages/VerifyEmail';  // ⬅️ ADD THIS LINE
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { AcceptInvitation } from './pages/AcceptInvitation';
+import { Settings } from './pages/Settings';
 
 
 function App() {
@@ -70,6 +71,7 @@ function App() {
 
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Router>
   );

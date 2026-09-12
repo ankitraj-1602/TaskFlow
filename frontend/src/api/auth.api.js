@@ -48,4 +48,7 @@ export const authApi = {
 sendVerificationEmail: () => {
   return apiClient.post('/auth/send-verification');
 },
+deleteAccount: (password) => {
+  return apiClient.delete('/auth/account', { data: { password } });
+},
 };
