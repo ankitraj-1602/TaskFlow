@@ -43,6 +43,12 @@ export const ProjectDetail = () => {
     loadProject(projectId);
   }, [projectId]);
 
+  useEffect(() => {
+  if (workspaces.length === 0) {
+    useWorkspaceStore.getState().loadWorkspaces().catch(() => {});
+  }
+}, []);
+
   if (isLoading || !currentProject) {
     return (
       <ProtectedLayout>
@@ -226,12 +232,12 @@ export const ProjectDetail = () => {
         )}
 
         {/* Tab Content: Members */}
-        {activeTab === 'members' && (
-          <ProjectMembersTab
-            projectId={projectId}
-            workspaceRole={workspaceRole}
-          />
-        )}
+       {activeTab === 'members' && (
+  <ProjectMembersTab
+    projectId={projectId}
+    workspaceRole={workspaceRole}
+  />
+)}
       </div>
     </ProtectedLayout>
   );

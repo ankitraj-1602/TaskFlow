@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Modal } from '../UI/Modal';
 import { Button } from '../Forms/Button';
 import { StatusBadge } from '../UI/StatusBadge';
 import { PriorityBadge } from '../UI/PriorityBadge';
 import { useTaskStore } from '../../store/task.store';
+import { useAuthStore } from '../../store/auth.store';
+import { usePermission } from '../../hooks/usePermission';
 import {
-  CalendarIcon,
-  UserCircleIcon,
   PencilSquareIcon,
   TrashIcon,
   DocumentDuplicateIcon,
@@ -16,9 +16,38 @@ import {
   PaperClipIcon,
 } from '@heroicons/react/24/outline';
 
-export const TaskDetailModal = ({ isOpen, onClose, task, onEdit }) => {
+export const TaskDetailModal = ({
+  isOpen,
+  onClose,
+  task,
+  onEdit,
+  workspaceRole,
+}) => {
   const { deleteTask, duplicateTask, archiveTask, isLoading } = useTaskStore();
+  const { user } = useAuthStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // ─── RBAC ─────────────────────────────────────────────
+  const { isMember, isManager } = usePermission(workspaceRole);
+
+  const isOwnTask =
+    task &&
+    (task.createdById === user?.id ||
+      task.assigneeUserId === user?.id ||
+      task.assigneeId === user?.id);
+
+  // Edit: MANAGER+ can edit any; MEMBER can edit own
+  const canEdit = isManager || (isMember && isOwnTask);
+
+  // Delete / Archive: MANAGER+
+  const canDelete = isManager;
+  const canArchive = isManager;
+
+  // Duplicate: MEMBER+ (matches backend "create task" permission)
+  const canDuplicate = isMember;
+
+  const hasAnyAction = canEdit || canDelete || canArchive || canDuplicate;
+  // ──────────────────────────────────────────────────────
 
   if (!task) return null;
 
@@ -38,7 +67,9 @@ export const TaskDetailModal = ({ isOpen, onClose, task, onEdit }) => {
       toast.success('Task duplicated');
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to duplicate task');
+      toast.error(
+        error.response?.data?.message || 'Failed to duplicate task'
+      );
     }
   };
 
@@ -52,7 +83,10 @@ export const TaskDetailModal = ({ isOpen, onClose, task, onEdit }) => {
     }
   };
 
-  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE';
+  const isOverdue =
+    task.dueDate &&
+    new Date(task.dueDate) < new Date() &&
+    task.status !== 'DONE';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Task Details" size="lg">
@@ -69,7 +103,9 @@ export const TaskDetailModal = ({ isOpen, onClose, task, onEdit }) => {
             </div>
           </div>
           {task.description && (
-            <p className="text-gray-600 whitespace-pre-wrap">{task.description}</p>
+            <p className="text-gray-600 whitespace-pre-wrap">
+              {task.description}
+            </p>
           )}
         </div>
 
@@ -92,7 +128,9 @@ export const TaskDetailModal = ({ isOpen, onClose, task, onEdit }) => {
                     </span>
                   </div>
                 )}
-                <span className="text-sm text-gray-900">{task.assigneeName}</span>
+                <span className="text-sm text-gray-900">
+                  {task.assigneeName}
+                </span>
               </div>
             ) : (
               <p className="text-sm text-gray-500">Unassigned</p>
@@ -108,9 +146,13 @@ export const TaskDetailModal = ({ isOpen, onClose, task, onEdit }) => {
 
           <div>
             <p className="text-xs text-gray-500 mb-1">Due Date</p>
-            <p className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
-              {task.dueDate 
-                ? new Date(task.dueDate).toLocaleDateString() 
+            <p
+              className={`text-sm ${
+                isOverdue ? 'text-red-600 font-medium' : 'text-gray-900'
+              }`}
+            >
+              {task.dueDate
+                ? new Date(task.dueDate).toLocaleDateString()
                 : 'Not set'}
               {isOverdue && ' (Overdue)'}
             </p>
@@ -118,9 +160,7 @@ export const TaskDetailModal = ({ isOpen, onClose, task, onEdit }) => {
 
           <div>
             <p className="text-xs text-gray-500 mb-1">Story Points</p>
-            <p className="text-sm text-gray-900">
-              {task.storyPoints || '—'}
-            </p>
+            <p className="text-sm text-gray-900">{task.storyPoints || '—'}</p>
           </div>
 
           <div>
@@ -150,49 +190,66 @@ export const TaskDetailModal = ({ isOpen, onClose, task, onEdit }) => {
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleArchive}
-              loading={isLoading}
-            >
-              <ArchiveBoxIcon className="h-4 w-4 mr-1" />
-              Archive
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleDuplicate}
-              loading={isLoading}
-            >
-              <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-              Duplicate
-            </Button>
+        {/* Actions — RBAC-aware */}
+        {hasAnyAction ? (
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <div className="flex items-center space-x-2">
+              {canArchive && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleArchive}
+                  loading={isLoading}
+                >
+                  <ArchiveBoxIcon className="h-4 w-4 mr-1" />
+                  Archive
+                </Button>
+              )}
+              {canDuplicate && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDuplicate}
+                  loading={isLoading}
+                >
+                  <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                  Duplicate
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center space-x-2">
+              {canDelete && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <TrashIcon className="h-4 w-4 mr-1" />
+                  Delete
+                </Button>
+              )}
+              {canEdit && onEdit && (
+                <Button size="sm" onClick={onEdit}>
+                  <PencilSquareIcon className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              <TrashIcon className="h-4 w-4 mr-1" />
-              Delete
-            </Button>
-            <Button size="sm" onClick={onEdit}>
-              <PencilSquareIcon className="h-4 w-4 mr-1" />
-              Edit
-            </Button>
+        ) : (
+          <div className="pt-4 border-t border-gray-200">
+            <p className="text-xs text-gray-500 italic text-center">
+              You have read-only access to this task.
+            </p>
           </div>
-        </div>
+        )}
 
         {/* Delete Confirmation */}
         {showDeleteConfirm && (
           <div className="p-4 bg-red-50 rounded-lg border border-red-200">
             <p className="text-sm text-gray-900 mb-3">
-              Are you sure you want to delete this task? This action cannot be undone.
+              Are you sure you want to delete this task? This action cannot be
+              undone.
             </p>
             <div className="flex space-x-2">
               <Button

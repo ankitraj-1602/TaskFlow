@@ -75,116 +75,144 @@ class TaskQueries {
     return result.rows[0] || null;
   }
 
-  static async findByProject(projectId, filters = {}) {
-    const conditions = ['t.project_id = $1'];
-    const values = [projectId];
-    let paramIndex = 2;
+static async findByProject(projectId, filters = {}) {
+  const conditions = ['t.project_id = $1'];
+  const values = [projectId];
+  let paramIndex = 2;
 
-    if (filters.status) {
-      const statuses = Array.isArray(filters.status)
-        ? filters.status
-        : [filters.status];
-      conditions.push(`t.status = ANY($${paramIndex})`);
+  // ─── Status ───────────────────────────────────────
+  if (filters.status) {
+    const statuses = Array.isArray(filters.status)
+      ? filters.status
+      : String(filters.status).split(',').map(s => s.trim()).filter(Boolean);
+
+    if (statuses.length === 1) {
+      conditions.push(`t.status = $${paramIndex}`);
+      values.push(statuses[0]);
+      paramIndex++;
+    } else if (statuses.length > 1) {
+      conditions.push(`t.status = ANY($${paramIndex}::task_status[])`);
       values.push(statuses);
       paramIndex++;
     }
-
-    if (filters.priority) {
-      conditions.push(`t.priority = $${paramIndex}`);
-      values.push(filters.priority);
-      paramIndex++;
-    }
-
-    if (filters.assigneeId) {
-      conditions.push(`t.assignee_id = $${paramIndex}`);
-      values.push(filters.assigneeId);
-      paramIndex++;
-    }
-
-    if (filters.isArchived !== undefined) {
-      conditions.push(`t.is_archived = $${paramIndex}`);
-      values.push(filters.isArchived);
-      paramIndex++;
-    } else {
-      conditions.push('t.is_archived = FALSE');
-    }
-
-    if (filters.search) {
-      conditions.push(`(t.title ILIKE $${paramIndex} OR t.description ILIKE $${paramIndex})`);
-      values.push(`%${filters.search}%`);
-      paramIndex++;
-    }
-
-    if (filters.dueBefore) {
-      conditions.push(`t.due_date <= $${paramIndex}`);
-      values.push(filters.dueBefore);
-      paramIndex++;
-    }
-
-    if (filters.dueAfter) {
-      conditions.push(`t.due_date >= $${paramIndex}`);
-      values.push(filters.dueAfter);
-      paramIndex++;
-    }
-
-    // Sorting
-    let orderBy = 't.position ASC, t.created_at DESC';
-    if (filters.sortBy) {
-      const sortField = filters.sortBy === 'dueDate' ? 'due_date' 
-        : filters.sortBy === 'priority' ? 'priority'
-        : filters.sortBy === 'createdAt' ? 'created_at'
-        : 'position';
-      const sortOrder = filters.sortOrder === 'desc' ? 'DESC' : 'ASC';
-      orderBy = `t.${sortField} ${sortOrder}`;
-    }
-
-    // Pagination
-    let limitClause = '';
-    if (filters.limit) {
-      const limit = parseInt(filters.limit);
-      const offset = ((parseInt(filters.page) || 1) - 1) * limit;
-      limitClause = ` LIMIT ${limit} OFFSET ${offset}`;
-    }
-
-    const query = `
-      SELECT t.*,
-        u.name as created_by_name,
-        a.name as assignee_name, a.profile_picture as assignee_picture,
-        (SELECT COUNT(*) FROM comments WHERE task_id = t.id) as comment_count,
-        (SELECT COUNT(*) FROM attachments WHERE task_id = t.id) as attachment_count
-      FROM tasks t
-      LEFT JOIN users u ON t.created_by_id = u.id
-      LEFT JOIN workspace_members wm ON t.assignee_id = wm.id
-      LEFT JOIN users a ON wm.user_id = a.id
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY ${orderBy}${limitClause}
-    `;
-    const result = await QueryHelper.query(query, values);
-    return result.rows;
   }
 
-  static async countByProject(projectId, filters = {}) {
-    const conditions = ['project_id = $1'];
-    const values = [projectId];
-    let paramIndex = 2;
+  // ─── Priority ─────────────────────────────────────
+  if (filters.priority) {
+    conditions.push(`t.priority = $${paramIndex}`);
+    values.push(filters.priority);
+    paramIndex++;
+  }
 
-    if (filters.status) {
+  // ─── Assignee ─────────────────────────────────────
+  if (filters.assigneeId) {
+    conditions.push(`t.assignee_id = $${paramIndex}`);
+    values.push(filters.assigneeId);
+    paramIndex++;
+  }
+
+  // ─── Archived ─────────────────────────────────────
+  if (filters.isArchived !== undefined) {
+    conditions.push(`t.is_archived = $${paramIndex}`);
+    values.push(filters.isArchived);
+    paramIndex++;
+  } else {
+    conditions.push('t.is_archived = FALSE');
+  }
+
+  // ─── Search ───────────────────────────────────────
+  if (filters.search) {
+    conditions.push(
+      `(t.title ILIKE $${paramIndex} OR t.description ILIKE $${paramIndex})`
+    );
+    values.push(`%${filters.search}%`);
+    paramIndex++;
+  }
+
+  // ─── Due date range ───────────────────────────────
+  if (filters.dueBefore) {
+    conditions.push(`t.due_date <= $${paramIndex}`);
+    values.push(filters.dueBefore);
+    paramIndex++;
+  }
+
+  if (filters.dueAfter) {
+    conditions.push(`t.due_date >= $${paramIndex}`);
+    values.push(filters.dueAfter);
+    paramIndex++;
+  }
+
+  // ─── Sorting ──────────────────────────────────────
+  let orderBy = 't.position ASC, t.created_at DESC';
+  if (filters.sortBy) {
+    const sortField =
+      filters.sortBy === 'dueDate' ? 'due_date'
+      : filters.sortBy === 'priority' ? 'priority'
+      : filters.sortBy === 'createdAt' ? 'created_at'
+      : 'position';
+    const sortOrder = filters.sortOrder === 'desc' ? 'DESC' : 'ASC';
+    orderBy = `t.${sortField} ${sortOrder}`;
+  }
+
+  // ─── Pagination ───────────────────────────────────
+  let limitClause = '';
+  if (filters.limit) {
+    const limit = parseInt(filters.limit);
+    const offset = ((parseInt(filters.page) || 1) - 1) * limit;
+    limitClause = ` LIMIT ${limit} OFFSET ${offset}`;
+  }
+
+  const query = `
+    SELECT t.*,
+      u.name as created_by_name,
+      a.name as assignee_name, a.profile_picture as assignee_picture,
+      wm.user_id as assignee_user_id,
+      0 as comment_count,
+      0 as attachment_count
+    FROM tasks t
+    LEFT JOIN users u ON t.created_by_id = u.id
+    LEFT JOIN workspace_members wm ON t.assignee_id = wm.id
+    LEFT JOIN users a ON wm.user_id = a.id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY ${orderBy}${limitClause}
+  `;
+
+  const result = await QueryHelper.query(query, values);
+  return result.rows;
+}
+
+static async countByProject(projectId, filters = {}) {
+  const conditions = ['project_id = $1'];
+  const values = [projectId];
+  let paramIndex = 2;
+
+  if (filters.status) {
+    const statuses = Array.isArray(filters.status)
+      ? filters.status
+      : String(filters.status).split(',').map(s => s.trim()).filter(Boolean);
+
+    if (statuses.length === 1) {
       conditions.push(`status = $${paramIndex}`);
-      values.push(filters.status);
+      values.push(statuses[0]);
+      paramIndex++;
+    } else if (statuses.length > 1) {
+      conditions.push(`status = ANY($${paramIndex}::task_status[])`);
+      values.push(statuses);
       paramIndex++;
     }
-
-    if (filters.isArchived !== undefined) {
-      conditions.push(`is_archived = $${paramIndex}`);
-      values.push(filters.isArchived);
-    } else {
-      conditions.push('is_archived = FALSE');
-    }
-
-    const query = `SELECT COUNT(*) as count FROM tasks WHERE ${conditions.join(' AND ')}`;
-    const result = await QueryHelper.query(query, values);
-    return parseInt(result.rows[0].count);
   }
+
+  if (filters.isArchived !== undefined) {
+    conditions.push(`is_archived = $${paramIndex}`);
+    values.push(filters.isArchived);
+  } else {
+    conditions.push('is_archived = FALSE');
+  }
+
+  const query = `SELECT COUNT(*) as count FROM tasks WHERE ${conditions.join(' AND ')}`;
+  const result = await QueryHelper.query(query, values);
+  return parseInt(result.rows[0].count);
+}
 
   static async update(id, data) {
     const fields = [];

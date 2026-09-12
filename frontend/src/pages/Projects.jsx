@@ -12,6 +12,7 @@ import { StatusBadge } from '../components/UI/StatusBadge';
 import { EmptyState } from '../components/UI/EmptyState';
 import { useProjectStore } from '../store/project.store';
 import { useWorkspaceStore } from '../store/workspace.store';
+import { usePermission } from '../hooks/usePermission';
 import {
   PlusIcon,
   MagnifyingGlassIcon,
@@ -34,11 +35,11 @@ const createProjectSchema = z.object({
 export const Projects = () => {
   const { workspaceId } = useParams();
   const navigate = useNavigate();
-  const { 
-    projects, 
-    loadWorkspaceProjects, 
-    createProject, 
-    isLoading 
+  const {
+    projects,
+    loadWorkspaceProjects,
+    createProject,
+    isLoading,
   } = useProjectStore();
   const { workspaces } = useWorkspaceStore();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -46,7 +47,17 @@ export const Projects = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
-  const workspace = workspaces.find(w => w.id === workspaceId);
+  const workspace = workspaces.find((w) => w.id === workspaceId);
+
+  // ─── RBAC ──────────────────────────────────────────────
+  const workspaceRole =
+    workspace?.owner_role === 'OWNER'
+      ? 'OWNER'
+      : workspace?.member_role || workspace?.userRole || 'VIEWER';
+
+  const { isManager } = usePermission(workspaceRole);
+  // isManager = OWNER | ADMIN | MANAGER (can create projects)
+  // ───────────────────────────────────────────────────────
 
   const {
     register,
@@ -76,8 +87,9 @@ export const Projects = () => {
     }
   };
 
-  const filteredProjects = projects.filter(project => {
-    const matchesSearch = !searchQuery || 
+  const filteredProjects = projects.filter((project) => {
+    const matchesSearch =
+      !searchQuery ||
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       project.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = !statusFilter || project.status === statusFilter;
@@ -101,10 +113,14 @@ export const Projects = () => {
             </h2>
             <p className="text-gray-600 mt-1">Manage your projects</p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <PlusIcon className="h-5 w-5 mr-2" />
-            New Project
-          </Button>
+
+          {/* ⬇️ RBAC: Only MANAGER+ sees the button */}
+          {isManager && (
+            <Button onClick={() => setShowCreateModal(true)}>
+              <PlusIcon className="h-5 w-5 mr-2" />
+              New Project
+            </Button>
+          )}
         </div>
 
         {/* Filters */}
@@ -154,21 +170,35 @@ export const Projects = () => {
         ) : filteredProjects.length === 0 ? (
           <EmptyState
             icon="📁"
-            title={searchQuery || statusFilter ? 'No projects found' : 'No projects yet'}
-            description={
-              searchQuery || statusFilter 
-                ? 'Try adjusting your filters' 
-                : 'Create your first project to get started'
+            title={
+              searchQuery || statusFilter ? 'No projects found' : 'No projects yet'
             }
-            actionLabel={!searchQuery && !statusFilter ? 'Create Project' : undefined}
-            onAction={!searchQuery && !statusFilter ? () => setShowCreateModal(true) : undefined}
+            description={
+              searchQuery || statusFilter
+                ? 'Try adjusting your filters'
+                : isManager
+                ? 'Create your first project to get started'
+                : 'No projects have been created yet'
+            }
+            actionLabel={
+              !searchQuery && !statusFilter && isManager
+                ? 'Create Project'
+                : undefined
+            }
+            onAction={
+              !searchQuery && !statusFilter && isManager
+                ? () => setShowCreateModal(true)
+                : undefined
+            }
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProjects.map((project) => (
               <div
                 key={project.id}
-                onClick={() => navigate(`/workspaces/${workspaceId}/projects/${project.id}`)}
+                onClick={() =>
+                  navigate(`/workspaces/${workspaceId}/projects/${project.id}`)
+                }
                 className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-3">
@@ -192,7 +222,9 @@ export const Projects = () => {
                   {project.due_date && (
                     <div className="flex items-center text-gray-500 col-span-2">
                       <CalendarIcon className="h-4 w-4 mr-1" />
-                      <span>Due {new Date(project.due_date).toLocaleDateString()}</span>
+                      <span>
+                        Due {new Date(project.due_date).toLocaleDateString()}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -201,92 +233,96 @@ export const Projects = () => {
           </div>
         )}
 
-        {/* Create Project Modal */}
-        <Modal
-          isOpen={showCreateModal}
-          onClose={() => {
-            setShowCreateModal(false);
-            reset();
-          }}
-          title="Create New Project"
-          size="lg"
-        >
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input
-              label="Project Name"
-              type="text"
-              fullWidth
-              placeholder="Website Redesign"
-              error={errors.name?.message}
-              {...register('name')}
-            />
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Describe your project..."
-                className={`w-full px-3 py-2 border ${
-                  errors.description ? 'border-red-500' : 'border-gray-300'
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500`}
-                {...register('description')}
-              />
-              {errors.description && (
-                <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                {...register('status')}
-              >
-                <option value="PLANNING">Planning</option>
-                <option value="ACTIVE">Active</option>
-                <option value="ON_HOLD">On Hold</option>
-                <option value="COMPLETED">Completed</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+        {/* Create Project Modal — RBAC: only rendered for MANAGER+ */}
+        {isManager && (
+          <Modal
+            isOpen={showCreateModal}
+            onClose={() => {
+              setShowCreateModal(false);
+              reset();
+            }}
+            title="Create New Project"
+            size="lg"
+          >
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <Input
-                label="Start Date"
-                type="date"
+                label="Project Name"
+                type="text"
                 fullWidth
-                error={errors.startDate?.message}
-                {...register('startDate')}
+                placeholder="Website Redesign"
+                error={errors.name?.message}
+                {...register('name')}
               />
-              <Input
-                label="Due Date"
-                type="date"
-                fullWidth
-                error={errors.dueDate?.message}
-                {...register('dueDate')}
-              />
-            </div>
 
-            <div className="flex justify-end space-x-3 pt-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setShowCreateModal(false);
-                  reset();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" loading={isLoading}>
-                Create Project
-              </Button>
-            </div>
-          </form>
-        </Modal>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Describe your project..."
+                  className={`w-full px-3 py-2 border ${
+                    errors.description ? 'border-red-500' : 'border-gray-300'
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                  {...register('description')}
+                />
+                {errors.description && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.description.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  {...register('status')}
+                >
+                  <option value="PLANNING">Planning</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="ON_HOLD">On Hold</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Start Date"
+                  type="date"
+                  fullWidth
+                  error={errors.startDate?.message}
+                  {...register('startDate')}
+                />
+                <Input
+                  label="Due Date"
+                  type="date"
+                  fullWidth
+                  error={errors.dueDate?.message}
+                  {...register('dueDate')}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    reset();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" loading={isLoading}>
+                  Create Project
+                </Button>
+              </div>
+            </form>
+          </Modal>
+        )}
       </div>
     </ProtectedLayout>
   );

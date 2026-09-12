@@ -42,24 +42,31 @@ export const TaskModal = ({ isOpen, onClose, task, projectId, defaultStatus }) =
     },
   });
 
+  // Load project members when modal opens for a project
   useEffect(() => {
-    if (projectId) {
+    if (isOpen && projectId) {
       loadProjectMembers(projectId);
     }
-  }, [projectId]);
+  }, [isOpen, projectId]);
 
+  // Reset form when modal opens or task changes
   useEffect(() => {
+    if (!isOpen) return;
+
     if (task) {
+      // Editing: pre-fill with task data
       reset({
-        title: task.title,
+        title: task.title || '',
         description: task.description || '',
-        status: task.status,
-        priority: task.priority,
+        status: task.status || 'TODO',
+        priority: task.priority || 'MEDIUM',
         dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-        storyPoints: task.storyPoints || '',
-        assigneeId: task.assigneeId || '',
+        storyPoints: task.storyPoints ?? '',
+        // ⬇️ Use assigneeUserId (users.id) — matches dropdown option values
+        assigneeId: task.assigneeUserId || '',
       });
     } else {
+      // Creating: empty form
       reset({
         title: '',
         description: '',
@@ -70,14 +77,17 @@ export const TaskModal = ({ isOpen, onClose, task, projectId, defaultStatus }) =
         assigneeId: '',
       });
     }
-  }, [task, defaultStatus]);
+  }, [isOpen, task, defaultStatus, reset]);
 
   const onSubmit = async (data) => {
     try {
       const payload = {
-        ...data,
+        title: data.title,
+        description: data.description || null,
+        status: data.status,
+        priority: data.priority,
         dueDate: data.dueDate || null,
-        storyPoints: data.storyPoints || null,
+        storyPoints: data.storyPoints === '' ? null : data.storyPoints,
         assigneeId: data.assigneeId || null,
       };
 
@@ -124,7 +134,9 @@ export const TaskModal = ({ isOpen, onClose, task, projectId, defaultStatus }) =
             {...register('description')}
           />
           {errors.description && (
-            <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
+            <p className="mt-1 text-sm text-red-600">
+              {errors.description.message}
+            </p>
           )}
         </div>
 

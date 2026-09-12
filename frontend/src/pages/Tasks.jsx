@@ -9,19 +9,22 @@ import { EmptyState } from '../components/UI/EmptyState';
 import { TaskModal } from '../components/Task/TaskModal';
 import { TaskDetailModal } from '../components/Task/TaskDetailModal';
 import { useTaskStore } from '../store/task.store';
+import { useWorkspaceStore } from '../store/workspace.store';
+import { usePermission } from '../hooks/usePermission';
 import {
   PlusIcon,
   MagnifyingGlassIcon,
   ArrowLeftIcon,
   FunnelIcon,
   CalendarIcon,
-  ChatBubbleLeftIcon,
 } from '@heroicons/react/24/outline';
 
 export const Tasks = () => {
   const { workspaceId, projectId } = useParams();
   const navigate = useNavigate();
   const { tasks, loadProjectTasks, isLoading, pagination } = useTaskStore();
+  const { workspaces, loadWorkspaces } = useWorkspaceStore();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
@@ -34,6 +37,26 @@ export const Tasks = () => {
   const [sortBy, setSortBy] = useState('position');
   const [sortOrder, setSortOrder] = useState('asc');
   const [page, setPage] = useState(1);
+
+  // ─── RBAC: Derive workspace role ──────────────────────────
+  const workspace = workspaces.find((w) => w.id === workspaceId);
+  const workspaceRole = workspace
+    ? workspace.owner_role === 'OWNER'
+      ? 'OWNER'
+      : workspace.member_role || workspace.userRole || 'VIEWER'
+    : 'VIEWER';
+
+  const { isMember, isManager } = usePermission(workspaceRole);
+  // isMember = OWNER | ADMIN | MANAGER | MEMBER
+  // isManager = OWNER | ADMIN | MANAGER
+  // ──────────────────────────────────────────────────────────
+
+  // Ensure workspaces are loaded (in case user lands here directly)
+  useEffect(() => {
+    if (workspaces.length === 0) {
+      loadWorkspaces().catch(() => {});
+    }
+  }, []);
 
   const loadTasks = () => {
     const filters = {
@@ -88,7 +111,9 @@ export const Tasks = () => {
         {/* Header */}
         <div className="flex items-center space-x-4 mb-6">
           <button
-            onClick={() => navigate(`/workspaces/${workspaceId}/projects/${projectId}`)}
+            onClick={() =>
+              navigate(`/workspaces/${workspaceId}/projects/${projectId}`)
+            }
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
@@ -102,14 +127,22 @@ export const Tasks = () => {
           <div className="flex space-x-3">
             <Button
               variant="secondary"
-              onClick={() => navigate(`/workspaces/${workspaceId}/projects/${projectId}/board`)}
+              onClick={() =>
+                navigate(
+                  `/workspaces/${workspaceId}/projects/${projectId}/board`
+                )
+              }
             >
               Board View
             </Button>
-            <Button onClick={() => setShowCreateModal(true)}>
-              <PlusIcon className="h-5 w-5 mr-2" />
-              New Task
-            </Button>
+
+            {/* ⬇️ RBAC: Only MEMBER+ can create tasks */}
+            {isMember && (
+              <Button onClick={() => setShowCreateModal(true)}>
+                <PlusIcon className="h-5 w-5 mr-2" />
+                New Task
+              </Button>
+            )}
           </div>
         </div>
 
@@ -193,14 +226,28 @@ export const Tasks = () => {
         ) : tasks.length === 0 ? (
           <EmptyState
             icon="✅"
-            title={searchQuery || statusFilter || priorityFilter ? 'No tasks found' : 'No tasks yet'}
+            title={
+              searchQuery || statusFilter || priorityFilter
+                ? 'No tasks found'
+                : 'No tasks yet'
+            }
             description={
               searchQuery || statusFilter || priorityFilter
                 ? 'Try adjusting your filters'
-                : 'Create your first task to get started'
+                : isMember
+                ? 'Create your first task to get started'
+                : 'No tasks have been created yet'
             }
-            actionLabel={!searchQuery && !statusFilter && !priorityFilter ? 'Create Task' : undefined}
-            onAction={!searchQuery && !statusFilter && !priorityFilter ? () => setShowCreateModal(true) : undefined}
+            actionLabel={
+              !searchQuery && !statusFilter && !priorityFilter && isMember
+                ? 'Create Task'
+                : undefined
+            }
+            onAction={
+              !searchQuery && !statusFilter && !priorityFilter && isMember
+                ? () => setShowCreateModal(true)
+                : undefined
+            }
           />
         ) : (
           <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -226,7 +273,10 @@ export const Tasks = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {tasks.map((task) => {
-                  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE';
+                  const isOverdue =
+                    task.dueDate &&
+                    new Date(task.dueDate) < new Date() &&
+                    task.status !== 'DONE';
                   return (
                     <tr
                       key={task.id}
@@ -274,12 +324,20 @@ export const Tasks = () => {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-sm text-gray-400">Unassigned</span>
+                          <span className="text-sm text-gray-400">
+                            Unassigned
+                          </span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {task.dueDate ? (
-                          <div className={`flex items-center text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
+                          <div
+                            className={`flex items-center text-sm ${
+                              isOverdue
+                                ? 'text-red-600 font-medium'
+                                : 'text-gray-900'
+                            }`}
+                          >
                             <CalendarIcon className="h-4 w-4 mr-1" />
                             {new Date(task.dueDate).toLocaleDateString()}
                           </div>
@@ -297,11 +355,19 @@ export const Tasks = () => {
             {pagination && pagination.totalPages > 1 && (
               <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200">
                 <div className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{(pagination.page - 1) * pagination.limit + 1}</span> to{' '}
+                  Showing{' '}
                   <span className="font-medium">
-                    {Math.min(pagination.page * pagination.limit, pagination.total)}
+                    {(pagination.page - 1) * pagination.limit + 1}
                   </span>{' '}
-                  of <span className="font-medium">{pagination.total}</span> results
+                  to{' '}
+                  <span className="font-medium">
+                    {Math.min(
+                      pagination.page * pagination.limit,
+                      pagination.total
+                    )}
+                  </span>{' '}
+                  of <span className="font-medium">{pagination.total}</span>{' '}
+                  results
                 </div>
                 <div className="flex space-x-2">
                   <Button
@@ -326,23 +392,28 @@ export const Tasks = () => {
           </div>
         )}
 
-        {/* Modals */}
-        <TaskModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          projectId={projectId}
-        />
+        {/* Create/Edit Task Modal — RBAC: only for MEMBER+ */}
+        {isMember && (
+          <>
+            <TaskModal
+              isOpen={showCreateModal}
+              onClose={() => setShowCreateModal(false)}
+              projectId={projectId}
+            />
 
-        <TaskModal
-          isOpen={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedTask(null);
-          }}
-          task={selectedTask}
-          projectId={projectId}
-        />
+            <TaskModal
+              isOpen={showEditModal}
+              onClose={() => {
+                setShowEditModal(false);
+                setSelectedTask(null);
+              }}
+              task={selectedTask}
+              projectId={projectId}
+            />
+          </>
+        )}
 
+        {/* Task Detail Modal — always available, RBAC handled internally */}
         <TaskDetailModal
           isOpen={showDetail}
           onClose={() => {
@@ -350,7 +421,8 @@ export const Tasks = () => {
             setSelectedTask(null);
           }}
           task={selectedTask}
-          onEdit={handleEditTask}
+          onEdit={isMember ? handleEditTask : undefined}
+          workspaceRole={workspaceRole}
         />
       </div>
     </ProtectedLayout>
