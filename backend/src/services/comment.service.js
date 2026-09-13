@@ -8,7 +8,7 @@ const UserQueries = require('../db/queries/user.queries');
 class CommentService {
   /**
    * Extract @mentions from comment content.
-   * Format: @email or @name. We'll use @email for reliability.
+   * Format: @email
    */
   extractMentionEmails(content) {
     const regex = /@([\w.+-]+@[\w-]+\.[\w.-]+)/g;
@@ -17,12 +17,11 @@ class CommentService {
     while ((match = regex.exec(content)) !== null) {
       matches.push(match[1]);
     }
-    return [...new Set(matches)]; // dedupe
+    return [...new Set(matches)];
   }
 
   /**
-   * Resolve mentioned emails to user IDs, but only those who are
-   * workspace members (to prevent mentioning outsiders).
+   * Resolve mentioned emails to user IDs — only workspace members.
    */
   async resolveMentionsToUserIds(emails, workspaceId) {
     if (emails.length === 0) return [];
@@ -30,14 +29,14 @@ class CommentService {
     const members = await WorkspaceQueries.getMembers(workspaceId);
     const memberEmails = new Set(members.map((m) => m.email.toLowerCase()));
 
-    const validUserIds = [];
+    const userIds = [];
     for (const email of emails) {
       if (memberEmails.has(email.toLowerCase())) {
         const user = await UserQueries.findByEmail(email);
-        if (user) validUserIds.push(user.id);
+        if (user) userIds.push(user.id);
       }
     }
-    return validUserIds;
+    return userIds;
   }
 
   async createComment(taskId, userId, data) {
@@ -51,7 +50,7 @@ class CommentService {
     );
     if (!hasAccess) throw new Error('You do not have access to this task');
 
-    // Validate parent comment belongs to same task
+    // Validate parent comment
     if (data.parentId) {
       const parent = await CommentQueries.findById(data.parentId);
       if (!parent || parent.task_id !== taskId) {
@@ -59,26 +58,27 @@ class CommentService {
       }
     }
 
-    // Create comment
-    const comment = await CommentQueries.create({
+    // Create
+    const created = await CommentQueries.create({
       content: data.content,
       taskId,
       authorId: userId,
       parentId: data.parentId,
     });
 
-    // Extract and store mentions
+    // Save mentions
     const emails = this.extractMentionEmails(data.content);
     const mentionedUserIds = await this.resolveMentionsToUserIds(
       emails,
       project.workspace_id
     );
     if (mentionedUserIds.length > 0) {
-      await MentionQueries.createMany(comment.id, mentionedUserIds);
+      await MentionQueries.createMany(created.id, mentionedUserIds);
     }
 
-    // Return enriched comment
-    return this.enrichComment(comment, mentionedUserIds);
+    // Re-fetch with author joins so the frontend gets full data
+    const fullComment = await CommentQueries.findById(created.id);
+    return this.enrichCommentTree(fullComment);
   }
 
   async getTaskComments(taskId, userId) {
@@ -100,12 +100,11 @@ class CommentService {
     const comment = await CommentQueries.findById(commentId);
     if (!comment) throw new Error('Comment not found');
 
-    // Only author can edit
     if (comment.author_id !== userId) {
       throw new Error('You can only edit your own comments');
     }
 
-    const updated = await CommentQueries.update(commentId, content);
+    await CommentQueries.update(commentId, content);
 
     // Re-sync mentions
     await MentionQueries.deleteByComment(commentId);
@@ -120,14 +119,15 @@ class CommentService {
       await MentionQueries.createMany(commentId, mentionedUserIds);
     }
 
-    return this.enrichComment(updated, mentionedUserIds);
+    // Re-fetch with author joins
+    const fullComment = await CommentQueries.findById(commentId);
+    return this.enrichCommentTree(fullComment);
   }
 
   async deleteComment(commentId, userId) {
     const comment = await CommentQueries.findById(commentId);
     if (!comment) throw new Error('Comment not found');
 
-    // Only author OR MANAGER+ can delete
     const task = await TaskQueries.findById(comment.task_id);
     const project = await ProjectQueries.findById(task.project_id);
     const workspaceRole = await this.getWorkspaceRole(
@@ -147,23 +147,8 @@ class CommentService {
   }
 
   // ─── Helpers ───────────────────────────────────────
-  enrichComment(comment, mentionedUserIds = []) {
-    if (!comment) return null;
-    return {
-      id: comment.id,
-      content: comment.content,
-      taskId: comment.task_id,
-      authorId: comment.author_id,
-      parentId: comment.parent_id,
-      isEdited: comment.is_edited,
-      editedAt: comment.edited_at,
-      createdAt: comment.created_at,
-      updatedAt: comment.updated_at,
-      mentionedUserIds,
-    };
-  }
-
   enrichCommentTree(comment) {
+    if (!comment) return null;
     return {
       id: comment.id,
       content: comment.content,

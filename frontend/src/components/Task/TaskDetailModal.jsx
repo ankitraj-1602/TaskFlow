@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Modal } from '../UI/Modal';
 import { Button } from '../Forms/Button';
 import { StatusBadge } from '../UI/StatusBadge';
 import { PriorityBadge } from '../UI/PriorityBadge';
+import { CommentList } from '../Comment/CommentList';
 import { useTaskStore } from '../../store/task.store';
 import { useAuthStore } from '../../store/auth.store';
+import { useProjectStore } from '../../store/project.store';
 import { usePermission } from '../../hooks/usePermission';
 import {
   PencilSquareIcon,
@@ -25,9 +27,10 @@ export const TaskDetailModal = ({
 }) => {
   const { deleteTask, duplicateTask, archiveTask, isLoading } = useTaskStore();
   const { user } = useAuthStore();
+  const { loadProjectMembers } = useProjectStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // ─── RBAC ─────────────────────────────────────────────
+  // ─── RBAC ─────────────────────────────────────────
   const { isMember, isManager } = usePermission(workspaceRole);
 
   const isOwnTask =
@@ -36,18 +39,21 @@ export const TaskDetailModal = ({
       task.assigneeUserId === user?.id ||
       task.assigneeId === user?.id);
 
-  // Edit: MANAGER+ can edit any; MEMBER can edit own
   const canEdit = isManager || (isMember && isOwnTask);
-
-  // Delete / Archive: MANAGER+
   const canDelete = isManager;
   const canArchive = isManager;
-
-  // Duplicate: MEMBER+ (matches backend "create task" permission)
   const canDuplicate = isMember;
 
   const hasAnyAction = canEdit || canDelete || canArchive || canDuplicate;
-  // ──────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────
+
+  // ─── Load project members for @mention autocomplete
+  useEffect(() => {
+    if (isOpen && task?.projectId) {
+      loadProjectMembers(task.projectId);
+    }
+  }, [isOpen, task?.projectId]);
+  // ──────────────────────────────────────────────────
 
   if (!task) return null;
 
@@ -67,9 +73,7 @@ export const TaskDetailModal = ({
       toast.success('Task duplicated');
       onClose();
     } catch (error) {
-      toast.error(
-        error.response?.data?.message || 'Failed to duplicate task'
-      );
+      toast.error(error.response?.data?.message || 'Failed to duplicate task');
     }
   };
 
@@ -190,7 +194,12 @@ export const TaskDetailModal = ({
           </div>
         </div>
 
-        {/* Actions — RBAC-aware */}
+        {/* Comments */}
+        <div className="pt-4 border-t border-gray-200">
+          <CommentList taskId={task.id} workspaceRole={workspaceRole} />
+        </div>
+
+        {/* Actions */}
         {hasAnyAction ? (
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
             <div className="flex items-center space-x-2">
