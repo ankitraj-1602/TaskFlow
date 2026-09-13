@@ -105,26 +105,31 @@ export const Tasks = () => {
     setPage(1);
   };
 
+  const hasActiveFilters = searchQuery || statusFilter || priorityFilter;
+  const selectClass =
+    'px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors';
+
   return (
     <ProtectedLayout>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center space-x-4 mb-6">
+        <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() =>
               navigate(`/workspaces/${workspaceId}/projects/${projectId}`)
             }
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+            aria-label="Back to project"
           >
             <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
           </button>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900">Tasks</h2>
-            <p className="text-gray-600 mt-1">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Tasks</h2>
+            <p className="text-gray-500 mt-1">
               {pagination?.total || tasks.length} tasks total
             </p>
           </div>
-          <div className="flex space-x-3">
+          <div className="flex gap-3">
             <Button
               variant="secondary"
               onClick={() =>
@@ -147,16 +152,16 @@ export const Tasks = () => {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
             <div className="lg:col-span-2 relative">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
               />
             </div>
 
@@ -166,7 +171,7 @@ export const Tasks = () => {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={selectClass}
             >
               <option value="">All Statuses</option>
               <option value="TODO">To Do</option>
@@ -182,7 +187,7 @@ export const Tasks = () => {
                 setPriorityFilter(e.target.value);
                 setPage(1);
               }}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={selectClass}
             >
               <option value="">All Priorities</option>
               <option value="LOW">Low</option>
@@ -198,7 +203,7 @@ export const Tasks = () => {
                 setSortBy(field);
                 setSortOrder(order);
               }}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={selectClass}
             >
               <option value="position-asc">Default</option>
               <option value="dueDate-asc">Due Date (Earliest)</option>
@@ -208,70 +213,63 @@ export const Tasks = () => {
             </select>
           </div>
 
-          {(searchQuery || statusFilter || priorityFilter) && (
-            <button
-              onClick={resetFilters}
-              className="mt-3 text-sm text-indigo-600 hover:text-indigo-500"
-            >
-              Clear filters
-            </button>
+          {hasActiveFilters && (
+            <div className="mt-3 flex items-center gap-2">
+              <FunnelIcon className="h-3.5 w-3.5 text-gray-400" />
+              <button
+                onClick={resetFilters}
+                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+              >
+                Clear filters
+              </button>
+            </div>
           )}
         </div>
 
         {/* Tasks List */}
         {isLoading && tasks.length === 0 ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
           </div>
         ) : tasks.length === 0 ? (
           <EmptyState
             icon="✅"
-            title={
-              searchQuery || statusFilter || priorityFilter
-                ? 'No tasks found'
-                : 'No tasks yet'
-            }
+            title={hasActiveFilters ? 'No tasks found' : 'No tasks yet'}
             description={
-              searchQuery || statusFilter || priorityFilter
+              hasActiveFilters
                 ? 'Try adjusting your filters'
                 : isMember
                 ? 'Create your first task to get started'
                 : 'No tasks have been created yet'
             }
-            actionLabel={
-              !searchQuery && !statusFilter && !priorityFilter && isMember
-                ? 'Create Task'
-                : undefined
-            }
+            actionLabel={!hasActiveFilters && isMember ? 'Create Task' : undefined}
             onAction={
-              !searchQuery && !statusFilter && !priorityFilter && isMember
-                ? () => setShowCreateModal(true)
-                : undefined
+              !hasActiveFilters && isMember ? () => setShowCreateModal(true) : undefined
             }
           />
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-100">
+              <thead className="bg-gray-50/60">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                     Task
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                     Priority
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                     Assignee
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                     Due Date
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-100">
                 {tasks.map((task) => {
                   const isOverdue =
                     task.dueDate &&
@@ -281,7 +279,7 @@ export const Tasks = () => {
                     <tr
                       key={task.id}
                       onClick={() => handleTaskClick(task)}
-                      className="hover:bg-gray-50 cursor-pointer"
+                      className="hover:bg-gray-50/70 cursor-pointer transition-colors"
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center">
@@ -310,10 +308,10 @@ export const Tasks = () => {
                               <img
                                 src={task.assigneePicture}
                                 alt={task.assigneeName}
-                                className="h-6 w-6 rounded-full"
+                                className="h-6 w-6 rounded-full ring-1 ring-gray-100"
                               />
                             ) : (
-                              <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center">
+                              <div className="h-6 w-6 rounded-full bg-indigo-50 flex items-center justify-center ring-1 ring-indigo-100">
                                 <span className="text-indigo-600 text-xs font-medium">
                                   {task.assigneeName.charAt(0).toUpperCase()}
                                 </span>
@@ -353,23 +351,23 @@ export const Tasks = () => {
 
             {/* Pagination */}
             {pagination && pagination.totalPages > 1 && (
-              <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200">
-                <div className="text-sm text-gray-700">
+              <div className="bg-white px-6 py-3.5 flex items-center justify-between border-t border-gray-100">
+                <div className="text-sm text-gray-500">
                   Showing{' '}
-                  <span className="font-medium">
+                  <span className="font-medium text-gray-900">
                     {(pagination.page - 1) * pagination.limit + 1}
                   </span>{' '}
                   to{' '}
-                  <span className="font-medium">
+                  <span className="font-medium text-gray-900">
                     {Math.min(
                       pagination.page * pagination.limit,
                       pagination.total
                     )}
                   </span>{' '}
-                  of <span className="font-medium">{pagination.total}</span>{' '}
+                  of <span className="font-medium text-gray-900">{pagination.total}</span>{' '}
                   results
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex gap-2">
                   <Button
                     variant="secondary"
                     size="sm"

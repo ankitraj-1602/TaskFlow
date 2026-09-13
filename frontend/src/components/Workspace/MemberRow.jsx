@@ -4,7 +4,7 @@ import { Badge } from '../UI/Badge';
 import { Button } from '../Forms/Button';
 import { useWorkspaceStore } from '../../store/workspace.store';
 import { usePermission } from '../../hooks/usePermission';
-import { TrashIcon } from '@heroicons/react/24/outline';
+import { TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 const roleVariant = {
   OWNER: 'purple',
@@ -50,7 +50,7 @@ const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   return (
     <>
-      <tr className="hover:bg-gray-50">
+      <tr className="hover:bg-gray-50/70 transition-colors">
         {/* User */}
         <td className="px-6 py-4">
           <div className="flex items-center">
@@ -58,10 +58,10 @@ const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
               <img
                 src={member.profile_picture}
                 alt={member.name}
-                className="h-10 w-10 rounded-full object-cover"
+                className="h-10 w-10 rounded-full object-cover ring-1 ring-gray-100"
               />
             ) : (
-              <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center ring-1 ring-indigo-100">
                 <span className="text-indigo-600 font-medium">
                   {member.name?.charAt(0).toUpperCase() || 'U'}
                 </span>
@@ -71,7 +71,7 @@ const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
               <p className="text-sm font-medium text-gray-900">
                 {member.name}
                 {isCurrentUser && (
-                  <span className="ml-2 text-xs text-gray-500">(You)</span>
+                  <span className="ml-2 text-xs font-normal text-gray-400">(You)</span>
                 )}
               </p>
               <p className="text-sm text-gray-500">{member.email}</p>
@@ -90,7 +90,7 @@ const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
               value={member.role}
               onChange={(e) => handleRoleChange(e.target.value)}
               disabled={changingRole}
-              className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <option value="VIEWER">Viewer</option>
               <option value="MEMBER">Member</option>
@@ -112,10 +112,11 @@ const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
           {isOwner && !isMemberOwner && !isCurrentUser && (
             <button
               onClick={() => setShowRemoveConfirm(true)}
-              className="text-red-600 hover:text-red-800"
+              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               title="Remove member"
+              aria-label={`Remove ${member.name}`}
             >
-              <TrashIcon className="h-5 w-5" />
+              <TrashIcon className="h-4.5 w-4.5" />
             </button>
           )}
         </td>
@@ -124,12 +125,15 @@ const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
       {/* Remove confirmation modal */}
       {showRemoveConfirm && (
         <tr>
-          <td colSpan={4} className="px-6 py-4 bg-red-50">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-800">
-                Remove <strong>{member.name}</strong> from this workspace?
-              </p>
-              <div className="flex space-x-2">
+          <td colSpan={4} className="px-6 py-4 bg-red-50/60 border-y border-red-100">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <ExclamationTriangleIcon className="h-4.5 w-4.5 text-red-500 shrink-0" />
+                <p className="text-sm text-gray-700">
+                  Remove <span className="font-medium text-gray-900">{member.name}</span> from this workspace?
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
                 <Button
                   size="sm"
                   variant="secondary"

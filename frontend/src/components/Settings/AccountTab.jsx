@@ -61,9 +61,9 @@ export const AccountTab = () => {
   return (
     <div className="space-y-6">
       {/* Profile Card */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Profile</h3>
+          <h3 className="text-base font-semibold text-gray-900">Profile</h3>
           <Button
             variant={isEditing ? 'secondary' : 'primary'}
             onClick={() => {
@@ -85,14 +85,14 @@ export const AccountTab = () => {
               {...register('name')}
             />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Bio
               </label>
               <textarea
                 rows={3}
                 className={`w-full px-3 py-2 border ${
-                  errors.bio ? 'border-red-500' : 'border-gray-300'
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                  errors.bio ? 'border-red-400' : 'border-gray-200'
+                } rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors`}
                 {...register('bio')}
               />
               {errors.bio && (
@@ -114,7 +114,7 @@ export const AccountTab = () => {
               error={errors.timezone?.message}
               {...register('timezone')}
             />
-            <div className="flex justify-end space-x-3 pt-2">
+            <div className="flex justify-end gap-3 pt-1">
               <Button
                 type="button"
                 variant="secondary"
@@ -131,27 +131,27 @@ export const AccountTab = () => {
             </div>
           </form>
         ) : (
-          <div className="space-y-4">
-            <div className="flex items-center space-x-4">
+          <div className="space-y-5">
+            <div className="flex items-center gap-4">
               {user?.profile_picture ? (
                 <img
                   src={user.profile_picture}
                   alt={user.name}
-                  className="h-16 w-16 rounded-full object-cover"
+                  className="h-16 w-16 rounded-full object-cover ring-1 ring-gray-100 shrink-0"
                 />
               ) : (
-                <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <span className="text-indigo-600 font-bold text-xl">
+                <div className="h-16 w-16 rounded-full bg-indigo-50 flex items-center justify-center ring-1 ring-indigo-100 shrink-0">
+                  <span className="text-indigo-600 font-semibold text-xl">
                     {user?.name?.charAt(0).toUpperCase() || 'U'}
                   </span>
                 </div>
               )}
-              <div>
-                <p className="text-lg font-semibold text-gray-900">
+              <div className="min-w-0">
+                <p className="text-lg font-semibold text-gray-900 truncate">
                   {user?.name}
                 </p>
                 <p className="text-sm text-gray-500">{user?.email}</p>
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-1.5 flex items-center gap-2">
                   {user?.is_email_verified ? (
                     <Badge variant="success">Email Verified</Badge>
                   ) : (
@@ -160,7 +160,7 @@ export const AccountTab = () => {
                       <button
                         onClick={handleResendVerification}
                         disabled={sendingVerification}
-                        className="text-xs text-indigo-600 hover:text-indigo-500 font-medium"
+                        className="text-xs text-indigo-600 hover:text-indigo-700 disabled:opacity-50 font-medium"
                       >
                         {sendingVerification ? 'Sending...' : 'Resend'}
                       </button>
@@ -170,34 +170,34 @@ export const AccountTab = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+            <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 pt-5 border-t border-gray-100">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Job Title</p>
-                <p className="text-sm text-gray-900 mt-1">
+                <dt className="text-xs font-medium text-gray-500">Job Title</dt>
+                <dd className="text-sm text-gray-900 mt-0.5">
                   {user?.job_title || '—'}
-                </p>
+                </dd>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Timezone</p>
-                <p className="text-sm text-gray-900 mt-1">
+                <dt className="text-xs font-medium text-gray-500">Timezone</dt>
+                <dd className="text-sm text-gray-900 mt-0.5">
                   {user?.timezone || 'UTC'}
-                </p>
+                </dd>
               </div>
               <div className="md:col-span-2">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Bio</p>
-                <p className="text-sm text-gray-900 mt-1">
+                <dt className="text-xs font-medium text-gray-500">Bio</dt>
+                <dd className="text-sm text-gray-900 mt-0.5">
                   {user?.bio || '—'}
-                </p>
+                </dd>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Member Since</p>
-                <p className="text-sm text-gray-900 mt-1">
+                <dt className="text-xs font-medium text-gray-500">Member Since</dt>
+                <dd className="text-sm text-gray-900 mt-0.5">
                   {user?.created_at
                     ? new Date(user.created_at).toLocaleDateString()
                     : '—'}
-                </p>
+                </dd>
               </div>
-            </div>
+            </dl>
           </div>
         )}
       </div>

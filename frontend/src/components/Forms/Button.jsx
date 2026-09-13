@@ -25,7 +25,7 @@ export const Button = ({
 
   return (
     <button
-      className={`${variants[variant]} ${sizes[size]} ${
+      className={`inline-flex items-center justify-center gap-1 ${variants[variant]} ${sizes[size]} ${
         fullWidth ? 'w-full' : ''
       } rounded-lg font-medium transition-colors ${
         disabled || loading ? 'opacity-50 cursor-not-allowed' : ''
@@ -34,10 +34,10 @@ export const Button = ({
       {...props}
     >
       {loading ? (
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+        <>
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
           Loading...
-        </div>
+        </>
       ) : (
         children
       )}

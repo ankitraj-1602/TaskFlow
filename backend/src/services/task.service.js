@@ -286,7 +286,6 @@ async updateTaskStatus(taskId, userId, status, position) {
 
   await TaskQueries.updateStatus(taskId, status, position);
 
-  // Log activity — use inline object, no need for outer `changes`
   if (oldStatus !== status) {
     await activityService.log({
       action: status === 'DONE' ? 'COMPLETED' : 'STATUS_CHANGED',
@@ -294,7 +293,7 @@ async updateTaskStatus(taskId, userId, status, position) {
       workspaceId: project.workspace_id,
       projectId: project.id,
       taskId,
-      changes: { from: oldStatus, to: status },   // ✅ inline object
+      changes: { from: oldStatus, to: status },
     });
   } else if (oldPosition !== position) {
     await activityService.log({
@@ -307,22 +306,21 @@ async updateTaskStatus(taskId, userId, status, position) {
     });
   }
 
-  if (changes.status) {
-  // Notify the assignee (if different from actor)
-  const members = await WorkspaceQueries.getMembers(project.workspace_id);
-  const assignee = members.find((m) => m.id === task.assignee_id);
-  if (assignee && assignee.user_id !== userId) {
-    await notificationService.notifyStatusChanged({
-      userId: assignee.user_id,
-      actorId: userId,
-      taskId,
-      taskTitle: task.title,
-      from: changes.status.from,
-      to: changes.status.to,
-      projectId: project.id,
-    });
+  if (oldStatus !== status) {
+    const members = await WorkspaceQueries.getMembers(project.workspace_id);
+    const assignee = members.find((m) => m.id === task.assignee_id);
+    if (assignee && assignee.user_id !== userId) {
+      await notificationService.notifyStatusChanged({
+        userId: assignee.user_id,
+        actorId: userId,
+        taskId,
+        taskTitle: task.title,
+        from: oldStatus,
+        to: status,
+        projectId: project.id,
+      });
+    }
   }
-}
 
   const fresh = await TaskQueries.findById(taskId);
   return this.enrichTask(fresh);

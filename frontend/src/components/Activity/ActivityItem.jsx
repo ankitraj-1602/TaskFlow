@@ -20,10 +20,10 @@ export const ActivityItem = ({ activity, compact = false }) => {
             <img
               src={activity.userPicture}
               alt={activity.userName}
-              className="h-8 w-8 rounded-full flex-shrink-0 mt-0.5"
+              className="h-8 w-8 rounded-full flex-shrink-0 mt-0.5 ring-1 ring-gray-100"
             />
           ) : (
-            <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <div className="h-8 w-8 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0 mt-0.5 ring-1 ring-indigo-100">
               <span className="text-indigo-600 text-xs font-semibold">
                 {initials}
               </span>
@@ -43,7 +43,7 @@ export const ActivityItem = ({ activity, compact = false }) => {
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-2">
           {!compact && (
-            <div className={`h-6 w-6 rounded ${bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+            <div className={`h-6 w-6 rounded-md ${bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
               <Icon className={`h-3.5 w-3.5 ${color}`} />
             </div>
           )}

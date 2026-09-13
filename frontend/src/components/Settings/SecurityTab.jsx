@@ -8,6 +8,10 @@ import { Input } from '../Forms/Input';
 import { Button } from '../Forms/Button';
 import { useAuthStore } from '../../store/auth.store';
 import { authApi } from '../../api/auth.api';
+import {
+  ComputerDesktopIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/outline';
 
 const passwordSchema = z
   .object({
@@ -78,11 +82,11 @@ export const SecurityTab = () => {
   return (
     <div className="space-y-6">
       {/* Change Password */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h3 className="text-base font-semibold text-gray-900 mb-1">
           Change Password
         </h3>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-500 mb-5">
           After changing your password, you'll need to sign in again.
         </p>
 
@@ -122,7 +126,7 @@ export const SecurityTab = () => {
             </label>
           </div>
 
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-1">
             <Button type="submit" loading={isSubmitting}>
               Update Password
             </Button>
@@ -131,23 +135,31 @@ export const SecurityTab = () => {
       </div>
 
       {/* Active Sessions */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h3 className="text-base font-semibold text-gray-900 mb-1">
           Active Sessions
         </h3>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-500 mb-5">
           If you've signed in on multiple devices and want to sign out everywhere,
           use the button below.
         </p>
 
-        <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-          <div>
-            <p className="text-sm font-medium text-gray-900">Current session</p>
-            <p className="text-xs text-gray-500">
-              This browser / device
-            </p>
+        <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50/50">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-white border border-gray-100 flex items-center justify-center shrink-0">
+              <ComputerDesktopIcon className="h-4 w-4 text-gray-500" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900">Current session</p>
+              <p className="text-xs text-gray-500">
+                This browser / device
+              </p>
+            </div>
           </div>
-          <span className="text-xs text-green-600 font-medium">Active</span>
+          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Active
+          </span>
         </div>
 
         <div className="mt-4">
@@ -160,11 +172,14 @@ export const SecurityTab = () => {
         </div>
 
         {showLogoutAllConfirm && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-gray-800 mb-3">
-              This will sign you out from every device, including this one. Continue?
-            </p>
-            <div className="flex space-x-2">
+          <div className="mt-4 p-4 bg-red-50/60 border border-red-100 rounded-xl">
+            <div className="flex items-start gap-2.5 mb-3">
+              <ExclamationTriangleIcon className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-gray-700">
+                This will sign you out from every device, including this one. Continue?
+              </p>
+            </div>
+            <div className="flex gap-2">
               <Button
                 size="sm"
                 variant="secondary"

@@ -54,8 +54,8 @@ export const ProjectDetail = () => {
   if (isLoading || !currentProject) {
     return (
       <ProtectedLayout>
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="flex justify-center py-24">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
         </div>
       </ProtectedLayout>
     );
@@ -65,10 +65,10 @@ export const ProjectDetail = () => {
   const stats = project.stats || {};
 
   const statCards = [
-    { label: 'To Do', value: stats.todo || 0, icon: ListBulletIcon, color: 'bg-gray-500' },
-    { label: 'In Progress', value: stats.inProgress || 0, icon: ClockIcon, color: 'bg-blue-500' },
-    { label: 'Review', value: stats.review || 0, icon: ExclamationTriangleIcon, color: 'bg-yellow-500' },
-    { label: 'Done', value: stats.done || 0, icon: CheckCircleIcon, color: 'bg-green-500' },
+    { label: 'To Do', value: stats.todo || 0, icon: ListBulletIcon, color: 'bg-gray-100', iconColor: 'text-gray-600' },
+    { label: 'In Progress', value: stats.inProgress || 0, icon: ClockIcon, color: 'bg-blue-50', iconColor: 'text-blue-600' },
+    { label: 'Review', value: stats.review || 0, icon: ExclamationTriangleIcon, color: 'bg-amber-50', iconColor: 'text-amber-600' },
+    { label: 'Done', value: stats.done || 0, icon: CheckCircleIcon, color: 'bg-emerald-50', iconColor: 'text-emerald-600' },
   ];
 
   const progress =
@@ -78,23 +78,24 @@ export const ProjectDetail = () => {
     <ProtectedLayout>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center space-x-4 mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-8">
           <button
             onClick={() => navigate(`/workspaces/${workspaceId}/projects`)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0 self-start"
+            aria-label="Back to projects"
           >
             <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
           </button>
-          <div className="flex-1">
-            <div className="flex items-center space-x-3">
-              <h2 className="text-2xl font-bold text-gray-900">{project.name}</h2>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-2xl font-semibold tracking-tight text-gray-900 truncate">{project.name}</h2>
               <StatusBadge status={project.status} size="lg" />
             </div>
-            <p className="text-gray-600 mt-1">
+            <p className="text-gray-500 mt-1">
               {project.description || 'No description'}
             </p>
           </div>
-          <div className="flex space-x-3">
+          <div className="flex gap-3">
             <Button
               variant="secondary"
               onClick={() =>
@@ -125,7 +126,7 @@ export const ProjectDetail = () => {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 mb-6">
+        <div className="border-b border-gray-200 mb-8">
           <nav className="-mb-px flex space-x-8">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -152,17 +153,21 @@ export const ProjectDetail = () => {
           <div className="space-y-6">
             {/* Project Meta */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg shadow p-4 flex items-center space-x-3">
-                <UserGroupIcon className="h-8 w-8 text-indigo-600" />
-                <div>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3.5">
+                <div className="h-11 w-11 shrink-0 rounded-xl bg-indigo-50 flex items-center justify-center">
+                  <UserGroupIcon className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div className="min-w-0">
                   <p className="text-xs text-gray-500">Owner</p>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-gray-900 truncate">
                     {project.owner_name || project.created_by_name || 'Unassigned'}
                   </p>
                 </div>
               </div>
-              <div className="bg-white rounded-lg shadow p-4 flex items-center space-x-3">
-                <CalendarIcon className="h-8 w-8 text-indigo-600" />
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3.5">
+                <div className="h-11 w-11 shrink-0 rounded-xl bg-indigo-50 flex items-center justify-center">
+                  <CalendarIcon className="h-5 w-5 text-indigo-600" />
+                </div>
                 <div>
                   <p className="text-xs text-gray-500">Due Date</p>
                   <p className="text-sm font-medium text-gray-900">
@@ -172,8 +177,10 @@ export const ProjectDetail = () => {
                   </p>
                 </div>
               </div>
-              <div className="bg-white rounded-lg shadow p-4 flex items-center space-x-3">
-                <ClipboardDocumentListIcon className="h-8 w-8 text-indigo-600" />
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3.5">
+                <div className="h-11 w-11 shrink-0 rounded-xl bg-indigo-50 flex items-center justify-center">
+                  <ClipboardDocumentListIcon className="h-5 w-5 text-indigo-600" />
+                </div>
                 <div>
                   <p className="text-xs text-gray-500">Total Tasks</p>
                   <p className="text-sm font-medium text-gray-900">
@@ -188,38 +195,38 @@ export const ProjectDetail = () => {
               {statCards.map((stat, index) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={index} className="bg-white rounded-lg shadow p-4">
+                  <div key={index} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                     <div className="flex items-center justify-between">
                       <div
-                        className={`${stat.color} h-10 w-10 rounded-lg flex items-center justify-center`}
+                        className={`${stat.color} h-10 w-10 rounded-xl flex items-center justify-center`}
                       >
-                        <Icon className="h-5 w-5 text-white" />
+                        <Icon className={`h-5 w-5 ${stat.iconColor}`} />
                       </div>
-                      <span className="text-2xl font-bold text-gray-900">
+                      <span className="text-2xl font-semibold text-gray-900">
                         {stat.value}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600 mt-2">{stat.label}</p>
+                    <p className="text-sm text-gray-500 mt-2.5">{stat.label}</p>
                   </div>
                 );
               })}
             </div>
 
             {/* Progress */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-semibold text-gray-900">Progress</h3>
-                <span className="text-2xl font-bold text-indigo-600">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-gray-900">Progress</h3>
+                <span className="text-2xl font-semibold text-indigo-600">
                   {progress}%
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
+              <div className="w-full bg-gray-100 rounded-full h-2.5">
                 <div
-                  className="bg-indigo-600 h-3 rounded-full transition-all duration-500"
+                  className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500"
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <div className="mt-3 flex justify-between text-sm text-gray-600">
+              <div className="mt-3 flex justify-between text-sm text-gray-500">
                 <span>
                   {stats.done || 0} of {stats.total || 0} tasks completed
                 </span>
@@ -241,9 +248,9 @@ export const ProjectDetail = () => {
   />
 )}
 {activeTab === 'activity' && (
-  <div className="bg-white rounded-lg shadow p-6">
+  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
     <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+      <h3 className="text-base font-semibold text-gray-900">Recent Activity</h3>
     </div>
     <ActivityFeed scope="project" id={projectId} limit={50} showRefresh />
   </div>

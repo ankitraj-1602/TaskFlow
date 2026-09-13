@@ -7,6 +7,7 @@ import { Modal } from '../UI/Modal';
 import { Input } from '../Forms/Input';
 import { Button } from '../Forms/Button';
 import { useWorkspaceStore } from '../../store/workspace.store';
+import { InformationCircleIcon } from '@heroicons/react/24/outline';
 
 const inviteSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -49,8 +50,8 @@ export const InviteMemberModal = ({ isOpen, onClose, workspaceId }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Invite Member" size="md">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <p className="text-sm text-gray-600">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <p className="text-sm text-gray-500">
           If the user has an account, they'll be added immediately.
           Otherwise, they'll receive an email invitation.
         </p>
@@ -65,11 +66,11 @@ export const InviteMemberModal = ({ isOpen, onClose, workspaceId }) => {
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
             Role
           </label>
           <select
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
             {...register('role')}
           >
             <option value="VIEWER">Viewer — Read-only access</option>
@@ -79,13 +80,14 @@ export const InviteMemberModal = ({ isOpen, onClose, workspaceId }) => {
           </select>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-xs text-blue-800">
-            <strong>Note:</strong> Only OWNER can change member roles after they join.
+        <div className="flex gap-2.5 bg-blue-50 border border-blue-100 rounded-lg p-3">
+          <InformationCircleIcon className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-blue-800 leading-relaxed">
+            <span className="font-medium">Note:</span> Only OWNER can change member roles after they join.
           </p>
         </div>
 
-        <div className="flex justify-end space-x-3 pt-2">
+        <div className="flex justify-end gap-3 pt-1">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>

@@ -5,7 +5,7 @@ import { AddProjectMemberModal } from './AddProjectMemberModal';
 import { useProjectStore } from '../../store/project.store';
 import { useAuthStore } from '../../store/auth.store';
 import { usePermission } from '../../hooks/usePermission';
-import { UserPlusIcon } from '@heroicons/react/24/outline';
+import { UserPlusIcon, UsersIcon } from '@heroicons/react/24/outline';
 
 export const ProjectMembersTab = ({ projectId, workspaceRole }) => {
   const { user } = useAuthStore();
@@ -28,9 +28,9 @@ export const ProjectMembersTab = ({ projectId, workspaceRole }) => {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">
-            Project Members ({projectMembers.length})
+            Project Members <span className="text-gray-400 font-normal">({projectMembers.length})</span>
           </h3>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-sm text-gray-500 mt-1">
             Team members with access to this project
           </p>
         </div>
@@ -43,34 +43,35 @@ export const ProjectMembersTab = ({ projectId, workspaceRole }) => {
       </div>
 
       {/* Members Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {isLoadingMembers && projectMembers.length === 0 ? (        // ⬅️ Changed
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
           </div>
         ) : projectMembers.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>No project members yet</p>
+          <div className="text-center py-16">
+            <UsersIcon className="h-8 w-8 text-gray-300 mx-auto" />
+            <p className="text-gray-500 text-sm mt-3">No project members yet</p>
           </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead className="bg-gray-50/60">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                   Member
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                   Joined
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 tracking-wide">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {projectMembers.map((member) => (
                 <ProjectMemberRow
                   key={member.id}

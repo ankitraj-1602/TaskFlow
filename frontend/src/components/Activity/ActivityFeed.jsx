@@ -70,17 +70,17 @@ export const ActivityFeed = ({
 
   if (isLoading && activities.length === 0) {
     return (
-      <div className="flex justify-center py-6">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+      <div className="flex justify-center py-8">
+        <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-200 border-t-indigo-600"></div>
       </div>
     );
   }
 
   if (activities.length === 0) {
     return (
-      <div className="text-center py-6 text-gray-400 text-sm">
-        <ClockIcon className="h-8 w-8 mx-auto mb-1 text-gray-300" />
-        <p>{emptyMessage}</p>
+      <div className="text-center py-10">
+        <ClockIcon className="h-7 w-7 mx-auto mb-2 text-gray-300" />
+        <p className="text-sm text-gray-500">{emptyMessage}</p>
       </div>
     );
   }
@@ -92,7 +92,7 @@ export const ActivityFeed = ({
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="text-xs text-gray-500 hover:text-indigo-600 flex items-center gap-1"
+            className="text-xs text-gray-500 hover:text-indigo-600 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors"
           >
             <ArrowPathIcon
               className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}

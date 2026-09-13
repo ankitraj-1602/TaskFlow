@@ -32,6 +32,21 @@ const createProjectSchema = z.object({
   dueDate: z.string().optional(),
 });
 
+// Deterministic accent color per project, based on name, so the grid matches
+// the same visual convention used on the Workspaces page.
+const ACCENTS = [
+  { bg: 'bg-indigo-50', text: 'text-indigo-600', ring: 'ring-indigo-100' },
+  { bg: 'bg-teal-50', text: 'text-teal-600', ring: 'ring-teal-100' },
+  { bg: 'bg-amber-50', text: 'text-amber-600', ring: 'ring-amber-100' },
+  { bg: 'bg-rose-50', text: 'text-rose-600', ring: 'ring-rose-100' },
+  { bg: 'bg-violet-50', text: 'text-violet-600', ring: 'ring-violet-100' },
+];
+
+const getAccent = (name = '') => {
+  const code = name.charCodeAt(0) || 0;
+  return ACCENTS[code % ACCENTS.length];
+};
+
 export const Projects = () => {
   const { workspaceId } = useParams();
   const navigate = useNavigate();
@@ -96,22 +111,26 @@ export const Projects = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const inputClass =
+    'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors';
+
   return (
     <ProtectedLayout>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center space-x-4 mb-6">
+        <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => navigate(`/workspaces/${workspaceId}`)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+            aria-label="Back to workspace"
           >
             <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
           </button>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900 truncate">
               {workspace?.name} - Projects
             </h2>
-            <p className="text-gray-600 mt-1">Manage your projects</p>
+            <p className="text-gray-500 mt-1">Manage your projects</p>
           </div>
 
           {/* ⬇️ RBAC: Only MANAGER+ sees the button */}
@@ -124,32 +143,34 @@ export const Projects = () => {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`${inputClass} pl-10`}
               />
             </div>
-            <div className="flex items-center space-x-2">
-              <FunnelIcon className="h-5 w-5 text-gray-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">All Statuses</option>
-                <option value="PLANNING">Planning</option>
-                <option value="ACTIVE">Active</option>
-                <option value="ON_HOLD">On Hold</option>
-                <option value="COMPLETED">Completed</option>
-              </select>
-              <label className="flex items-center text-sm text-gray-600">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <FunnelIcon className="h-4 w-4 text-gray-400 shrink-0" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className={`${inputClass} bg-white text-gray-700`}
+                >
+                  <option value="">All Statuses</option>
+                  <option value="PLANNING">Planning</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="ON_HOLD">On Hold</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
+              </div>
+              <label className="flex items-center text-sm text-gray-600 whitespace-nowrap">
                 <input
                   type="checkbox"
                   checked={showArchived}
@@ -164,8 +185,8 @@ export const Projects = () => {
 
         {/* Projects Grid */}
         {isLoading && projects.length === 0 ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
           </div>
         ) : filteredProjects.length === 0 ? (
           <EmptyState
@@ -192,44 +213,52 @@ export const Projects = () => {
             }
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProjects.map((project) => (
-              <div
-                key={project.id}
-                onClick={() =>
-                  navigate(`/workspaces/${workspaceId}/projects/${project.id}`)
-                }
-                className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 cursor-pointer"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900 line-clamp-1">
-                    {project.name}
-                  </h3>
-                  <StatusBadge status={project.status} />
-                </div>
-                <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                  {project.description || 'No description'}
-                </p>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex items-center text-gray-500">
-                    <ClipboardDocumentListIcon className="h-4 w-4 mr-1" />
-                    <span>{project.task_count || 0} tasks</span>
-                  </div>
-                  <div className="flex items-center text-gray-500">
-                    <UserGroupIcon className="h-4 w-4 mr-1" />
-                    <span>{project.member_count || 0} members</span>
-                  </div>
-                  {project.due_date && (
-                    <div className="flex items-center text-gray-500 col-span-2">
-                      <CalendarIcon className="h-4 w-4 mr-1" />
-                      <span>
-                        Due {new Date(project.due_date).toLocaleDateString()}
-                      </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredProjects.map((project) => {
+              const accent = getAccent(project.name);
+              return (
+                <div
+                  key={project.id}
+                  onClick={() =>
+                    navigate(`/workspaces/${workspaceId}/projects/${project.id}`)
+                  }
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-shadow p-5 cursor-pointer"
+                >
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className={`h-10 w-10 shrink-0 rounded-xl ${accent.bg} flex items-center justify-center ring-1 ${accent.ring}`}>
+                      <FolderIcon className={`h-5 w-5 ${accent.text}`} />
                     </div>
-                  )}
+                    <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                      <h3 className="text-base font-semibold text-gray-900 line-clamp-1 pt-1.5">
+                        {project.name}
+                      </h3>
+                      <StatusBadge status={project.status} />
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500 line-clamp-2 mb-4">
+                    {project.description || 'No description'}
+                  </p>
+                  <div className="pt-3 border-t border-gray-50 grid grid-cols-2 gap-2.5 text-sm">
+                    <div className="flex items-center text-gray-500">
+                      <ClipboardDocumentListIcon className="h-4 w-4 mr-1.5" />
+                      <span>{project.task_count || 0} tasks</span>
+                    </div>
+                    <div className="flex items-center text-gray-500">
+                      <UserGroupIcon className="h-4 w-4 mr-1.5" />
+                      <span>{project.member_count || 0} members</span>
+                    </div>
+                    {project.due_date && (
+                      <div className="flex items-center text-gray-500 col-span-2">
+                        <CalendarIcon className="h-4 w-4 mr-1.5" />
+                        <span>
+                          Due {new Date(project.due_date).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -255,15 +284,15 @@ export const Projects = () => {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Description
                 </label>
                 <textarea
                   rows={3}
                   placeholder="Describe your project..."
                   className={`w-full px-3 py-2 border ${
-                    errors.description ? 'border-red-500' : 'border-gray-300'
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                    errors.description ? 'border-red-400' : 'border-gray-200'
+                  } rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors`}
                   {...register('description')}
                 />
                 {errors.description && (
@@ -274,11 +303,11 @@ export const Projects = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Status
                 </label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className={`${inputClass} bg-white text-gray-700`}
                   {...register('status')}
                 >
                   <option value="PLANNING">Planning</option>
@@ -305,7 +334,7 @@ export const Projects = () => {
                 />
               </div>
 
-              <div className="flex justify-end space-x-3 pt-2">
+              <div className="flex justify-end gap-3 pt-1">
                 <Button
                   type="button"
                   variant="secondary"

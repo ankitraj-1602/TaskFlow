@@ -18,11 +18,13 @@ import {
   ViewColumnsIcon,
 } from '@heroicons/react/24/outline';
 
+// Aligned with the blue/amber/emerald accent convention used on the
+// Dashboard, WorkspaceDetail, and ProjectDetail stat cards.
 const COLUMNS = [
-  { id: 'TODO', title: 'To Do', color: 'bg-gray-500' },
+  { id: 'TODO', title: 'To Do', color: 'bg-gray-400' },
   { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-blue-500' },
-  { id: 'REVIEW', title: 'Review', color: 'bg-yellow-500' },
-  { id: 'DONE', title: 'Done', color: 'bg-green-500' },
+  { id: 'REVIEW', title: 'Review', color: 'bg-amber-500' },
+  { id: 'DONE', title: 'Done', color: 'bg-emerald-500' },
 ];
 
 export const KanbanBoard = () => {
@@ -107,30 +109,31 @@ export const KanbanBoard = () => {
     <ProtectedLayout>
       <div className="max-w-full mx-auto">
         {/* Header */}
-        <div className="flex items-center space-x-4 mb-6">
+        <div className="flex flex-wrap items-center gap-4 mb-8">
           <button
             onClick={() =>
               navigate(`/workspaces/${workspaceId}/projects/${projectId}`)
             }
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+            aria-label="Back to project"
           >
             <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
           </button>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900">Kanban Board</h2>
-            <p className="text-gray-600 mt-1">
+          <div className="flex-1 min-w-[200px]">
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Kanban Board</h2>
+            <p className="text-gray-500 mt-1">
               Drag tasks between columns to update status
             </p>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-3">
             <div className="relative">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64"
+                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors w-64"
               />
             </div>
             <Button
@@ -155,8 +158,8 @@ export const KanbanBoard = () => {
 
         {/* Board */}
         {isLoading && tasks.length === 0 ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
           </div>
         ) : (
           <div className="flex gap-4 overflow-x-auto pb-4">

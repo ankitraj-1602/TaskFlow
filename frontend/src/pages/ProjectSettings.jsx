@@ -9,7 +9,7 @@ import { Input } from '../components/Forms/Input';
 import { Button } from '../components/Forms/Button';
 import { Modal } from '../components/UI/Modal';
 import { useProjectStore } from '../store/project.store';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArchiveBoxIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 const updateProjectSchema = z.object({
   name: z.string().min(2).max(100),
@@ -99,8 +99,8 @@ export const ProjectSettings = () => {
   if (!currentProject) {
     return (
       <ProtectedLayout>
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="flex justify-center py-24">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
         </div>
       </ProtectedLayout>
     );
@@ -108,19 +108,21 @@ export const ProjectSettings = () => {
 
   return (
     <ProtectedLayout>
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center space-x-4 mb-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => navigate(`/workspaces/${workspaceId}/projects/${projectId}`)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+            aria-label="Back to project"
           >
             <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
           </button>
-          <h2 className="text-2xl font-bold text-gray-900">Project Settings</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Project Settings</h2>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">General Settings</h3>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+          <h3 className="text-base font-semibold text-gray-900 mb-1">General Settings</h3>
+          <p className="text-sm text-gray-500 mb-5">Update the project's details and timeline.</p>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <Input
               label="Project Name"
@@ -131,14 +133,14 @@ export const ProjectSettings = () => {
             />
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Description
               </label>
               <textarea
                 rows={3}
                 className={`w-full px-3 py-2 border ${
-                  errors.description ? 'border-red-500' : 'border-gray-300'
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                  errors.description ? 'border-red-400' : 'border-gray-200'
+                } rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors`}
                 {...register('description')}
               />
               {errors.description && (
@@ -147,11 +149,11 @@ export const ProjectSettings = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Status
               </label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                 {...register('status')}
               >
                 <option value="PLANNING">Planning</option>
@@ -177,7 +179,7 @@ export const ProjectSettings = () => {
               />
             </div>
 
-            <div className="flex justify-end space-x-3 pt-2">
+            <div className="flex justify-end gap-3 pt-1">
               <Button
                 type="button"
                 variant="secondary"
@@ -193,29 +195,43 @@ export const ProjectSettings = () => {
         </div>
 
         {/* Archive Section */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {currentProject.is_archived ? 'Unarchive Project' : 'Archive Project'}
-          </h3>
-          <p className="text-gray-600 text-sm mb-4">
-            {currentProject.is_archived
-              ? 'Restore this project to active status.'
-              : 'Archiving hides the project from the main view but preserves all data.'}
-          </p>
-          <Button variant="secondary" onClick={onToggleArchive} loading={isLoading}>
-            {currentProject.is_archived ? 'Unarchive Project' : 'Archive Project'}
-          </Button>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+          <div className="flex items-start gap-3.5">
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-gray-100 flex items-center justify-center">
+              <ArchiveBoxIcon className="h-5 w-5 text-gray-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-base font-semibold text-gray-900 mb-1">
+                {currentProject.is_archived ? 'Unarchive Project' : 'Archive Project'}
+              </h3>
+              <p className="text-gray-500 text-sm mb-4">
+                {currentProject.is_archived
+                  ? 'Restore this project to active status.'
+                  : 'Archiving hides the project from the main view but preserves all data.'}
+              </p>
+              <Button variant="secondary" onClick={onToggleArchive} loading={isLoading}>
+                {currentProject.is_archived ? 'Unarchive Project' : 'Archive Project'}
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Danger Zone */}
-        <div className="bg-white rounded-lg shadow p-6 border border-red-200">
-          <h3 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h3>
-          <p className="text-gray-600 text-sm mb-4">
-            Once you delete a project, all tasks and data will be permanently deleted.
-          </p>
-          <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>
-            Delete Project
-          </Button>
+        <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6">
+          <div className="flex items-start gap-3.5">
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-red-50 flex items-center justify-center">
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-base font-semibold text-red-600 mb-1">Danger Zone</h3>
+              <p className="text-gray-500 text-sm mb-4">
+                Once you delete a project, all tasks and data will be permanently deleted.
+              </p>
+              <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+                Delete Project
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Delete Confirmation Modal */}
@@ -225,11 +241,11 @@ export const ProjectSettings = () => {
           title="Delete Project"
           size="sm"
         >
-          <p className="text-gray-600 mb-4">
-            Are you sure you want to delete <strong>{currentProject.name}</strong>? 
+          <p className="text-gray-600 mb-5 text-sm">
+            Are you sure you want to delete <span className="font-medium text-gray-900">{currentProject.name}</span>? 
             This action cannot be undone.
           </p>
-          <div className="flex justify-end space-x-3">
+          <div className="flex justify-end gap-3">
             <Button
               variant="secondary"
               onClick={() => setShowDeleteConfirm(false)}

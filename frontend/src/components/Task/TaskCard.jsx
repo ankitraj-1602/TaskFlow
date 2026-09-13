@@ -14,12 +14,12 @@ export const TaskCard = ({ task, onClick, isDragging }) => {
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-all ${
+      className={`bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-gray-200 transition-all ${
         isDragging ? 'opacity-50 rotate-2' : ''
       }`}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-2">
+      <div className="flex items-start justify-between gap-2 mb-2">
         <h4 className="text-sm font-medium text-gray-900 line-clamp-2 flex-1">
           {task.title}
         </h4>
@@ -35,7 +35,7 @@ export const TaskCard = ({ task, onClick, isDragging }) => {
 
       {/* Meta */}
       <div className="flex items-center justify-between text-xs text-gray-500">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
           {task.dueDate && (
             <div className={`flex items-center ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
               <CalendarIcon className="h-3.5 w-3.5 mr-1" />
@@ -43,7 +43,7 @@ export const TaskCard = ({ task, onClick, isDragging }) => {
             </div>
           )}
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2.5">
           {task.commentCount > 0 && (
             <div className="flex items-center">
               <ChatBubbleLeftIcon className="h-3.5 w-3.5 mr-0.5" />
@@ -66,10 +66,10 @@ export const TaskCard = ({ task, onClick, isDragging }) => {
             <img
               src={task.assigneePicture}
               alt={task.assigneeName}
-              className="h-6 w-6 rounded-full object-cover"
+              className="h-6 w-6 rounded-full object-cover ring-1 ring-gray-100"
             />
           ) : (
-            <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center">
+            <div className="h-6 w-6 rounded-full bg-indigo-50 flex items-center justify-center ring-1 ring-indigo-100">
               <span className="text-indigo-600 text-xs font-medium">
                 {task.assigneeName.charAt(0).toUpperCase()}
               </span>

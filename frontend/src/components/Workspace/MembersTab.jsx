@@ -7,7 +7,7 @@ import { InviteMemberModal } from './InviteMemberModal';
 import { useWorkspaceStore } from '../../store/workspace.store';
 import { useAuthStore } from '../../store/auth.store';
 import { usePermission } from '../../hooks/usePermission';
-import { UserPlusIcon, ClockIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { UserPlusIcon, ClockIcon, XMarkIcon, UsersIcon } from '@heroicons/react/24/outline';
 
 export const MembersTab = ({ workspaceId, userRole }) => {
   const { user } = useAuthStore();
@@ -39,14 +39,14 @@ const { canManageMembers } = usePermission(userRole);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">
-            Team Members ({members.length})
+            Team Members <span className="text-gray-400 font-normal">({members.length})</span>
           </h3>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-sm text-gray-500 mt-1">
             Manage who has access to this workspace
           </p>
         </div>
@@ -59,34 +59,35 @@ const { canManageMembers } = usePermission(userRole);
       </div>
 
       {/* Members Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {isLoading && members.length === 0 ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
           </div>
         ) : members.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>No members yet</p>
+          <div className="text-center py-16">
+            <UsersIcon className="h-8 w-8 text-gray-300 mx-auto" />
+            <p className="text-gray-500 text-sm mt-3">No members yet</p>
           </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead className="bg-gray-50/60">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                   Member
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                   Joined
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 tracking-wide">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {members.map((member) => (
                 <MemberRow
                   key={member.id}
@@ -105,32 +106,32 @@ const { canManageMembers } = usePermission(userRole);
       {canManageMembers && pendingInvitations.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            Pending Invitations ({pendingInvitations.length})
+            Pending Invitations <span className="text-gray-400 font-normal">({pendingInvitations.length})</span>
           </h3>
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-100">
+              <thead className="bg-gray-50/60">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                     Email
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                     Role
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                     Expires
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 tracking-wide">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-100">
                 {pendingInvitations.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-gray-50">
+                  <tr key={inv.id} className="hover:bg-gray-50/70 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <ClockIcon className="h-5 w-5 text-yellow-500 mr-2" />
+                        <ClockIcon className="h-4 w-4 text-amber-500 mr-2" />
                         <span className="text-sm text-gray-900">{inv.email}</span>
                       </div>
                     </td>
@@ -143,10 +144,11 @@ const { canManageMembers } = usePermission(userRole);
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => handleCancelInvitation(inv.id)}
-                        className="text-red-600 hover:text-red-800"
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         title="Cancel invitation"
+                        aria-label={`Cancel invitation to ${inv.email}`}
                       >
-                        <XMarkIcon className="h-5 w-5" />
+                        <XMarkIcon className="h-4 w-4" />
                       </button>
                     </td>
                   </tr>

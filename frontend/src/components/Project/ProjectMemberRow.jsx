@@ -4,7 +4,7 @@ import { Badge } from '../UI/Badge';
 import { Button } from '../Forms/Button';
 import { useProjectStore } from '../../store/project.store';
 import { usePermission } from '../../hooks/usePermission';
-import { TrashIcon } from '@heroicons/react/24/outline';
+import { TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 const roleVariant = {
   OWNER: 'purple',
@@ -43,17 +43,17 @@ export const ProjectMemberRow = ({
 
   return (
     <>
-      <tr className="hover:bg-gray-50">
+      <tr className="hover:bg-gray-50/70 transition-colors">
         <td className="px-6 py-4">
           <div className="flex items-center">
             {member.profile_picture ? (
               <img
                 src={member.profile_picture}
                 alt={member.name}
-                className="h-10 w-10 rounded-full object-cover"
+                className="h-10 w-10 rounded-full object-cover ring-1 ring-gray-100"
               />
             ) : (
-              <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center ring-1 ring-indigo-100">
                 <span className="text-indigo-600 font-medium">
                   {member.name?.charAt(0).toUpperCase() || 'U'}
                 </span>
@@ -63,7 +63,7 @@ export const ProjectMemberRow = ({
               <p className="text-sm font-medium text-gray-900">
                 {member.name}
                 {isCurrentUser && (
-                  <span className="ml-2 text-xs text-gray-500">(You)</span>
+                  <span className="ml-2 text-xs font-normal text-gray-400">(You)</span>
                 )}
               </p>
               <p className="text-sm text-gray-500">{member.email}</p>
@@ -87,10 +87,11 @@ export const ProjectMemberRow = ({
           {canRemove && (
             <button
               onClick={() => setShowRemoveConfirm(true)}
-              className="text-red-600 hover:text-red-800"
+              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               title="Remove from project"
+              aria-label={`Remove ${member.name} from project`}
             >
-              <TrashIcon className="h-5 w-5" />
+              <TrashIcon className="h-4 w-4" />
             </button>
           )}
         </td>
@@ -98,13 +99,16 @@ export const ProjectMemberRow = ({
 
       {showRemoveConfirm && (
         <tr>
-          <td colSpan={4} className="px-6 py-4 bg-red-50">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-800">
-                Remove <strong>{member.name}</strong> from this project? They'll
-                remain in the workspace.
-              </p>
-              <div className="flex space-x-2">
+          <td colSpan={4} className="px-6 py-4 bg-red-50/60 border-y border-red-100">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <ExclamationTriangleIcon className="h-4 w-4 text-red-500 shrink-0" />
+                <p className="text-sm text-gray-700">
+                  Remove <span className="font-medium text-gray-900">{member.name}</span> from this project? They'll
+                  remain in the workspace.
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
                 <Button
                   size="sm"
                   variant="secondary"
