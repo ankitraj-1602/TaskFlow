@@ -13,7 +13,7 @@ import { NotificationDropdown } from '../Notification/NotificationDropdown';
 
 export const Navbar = () => {
   const { user, logout } = useAuthStore();
-  const { unreadCount, startPolling, stopPolling } = useNotificationStore();
+  const { unreadCount, startPolling, stopPolling,loadUnreadCount } = useNotificationStore();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -23,14 +23,16 @@ export const Navbar = () => {
   };
 
   // Start polling when logged in, stop on unmount
-  useEffect(() => {
-    if (user) {
-      startPolling(30000); // every 30 seconds
-    }
-    return () => {
-      stopPolling();
-    };
-  }, [user]);
+useEffect(() => {
+  if (user) {
+    // No longer needed — socket handles real-time
+    // startPolling(30000);
+    loadUnreadCount() // initial count on mount
+  }
+  return () => {
+    // stopPolling();
+  };
+}, [user]);
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">

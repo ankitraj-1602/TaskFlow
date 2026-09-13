@@ -21,10 +21,14 @@ import { AcceptInvitation } from './pages/AcceptInvitation';
 import { Settings } from './pages/Settings';
 import { KanbanBoard } from './pages/KanbanBoard';
 import { Notifications } from './pages/Notifications';
+import { useSocketStore } from './store/socket.store';
+import { useSocketEvents } from './hooks/useSocketEvents';
 
 
 function App() {
-  const { loadUser, isAuthenticated } = useAuthStore();
+    const { loadUser, isAuthenticated } = useAuthStore();
+  const { connect, disconnect } = useSocketStore();
+   useSocketEvents();
 
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
@@ -32,6 +36,14 @@ function App() {
       loadUser().catch(() => {});
     }
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      connect();
+    } else {
+      disconnect();
+    }
+  }, [isAuthenticated]);
 
   return (
     <Router>

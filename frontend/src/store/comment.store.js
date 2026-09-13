@@ -97,4 +97,54 @@ export const useCommentStore = create((set, get) => ({
   clearComments: () => {
     set({ comments: [], taskId: null });
   },
+  addCommentFromSocket: (comment, taskId) => {
+  // Only add if we're currently viewing this task
+  if (get().taskId !== taskId) return;
+
+  set((state) => {
+    // Skip if comment already exists (avoid dupes when user is the actor)
+    const exists = state.comments.find((c) => c.id === comment.id);
+    if (exists) return state;
+
+    if (comment.parentId) {
+      return {
+        comments: state.comments.map((c) =>
+          c.id === comment.parentId
+            ? { ...c, replies: [...(c.replies || []), comment] }
+            : c
+        ),
+      };
+    }
+    return { comments: [...state.comments, comment] };
+  });
+},
+
+updateCommentFromSocket: (comment) => {
+  set((state) => ({
+    comments: state.comments.map((c) => {
+      if (c.id === comment.id) {
+        return { ...c, content: comment.content, isEdited: comment.isEdited };
+      }
+      return {
+        ...c,
+        replies: (c.replies || []).map((r) =>
+          r.id === comment.id
+            ? { ...r, content: comment.content, isEdited: comment.isEdited }
+            : r
+        ),
+      };
+    }),
+  }));
+},
+
+removeCommentFromSocket: (commentId) => {
+  set((state) => ({
+    comments: state.comments
+      .filter((c) => c.id !== commentId)
+      .map((c) => ({
+        ...c,
+        replies: (c.replies || []).filter((r) => r.id !== commentId),
+      })),
+  }));
+},
 }));

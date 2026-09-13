@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi } from '../api/auth.api';
+import { useSocketStore } from './socket.store';
 
 export const useAuthStore = create(
   persist(
@@ -57,15 +58,16 @@ export const useAuthStore = create(
         }
       },
 
-      logout: async () => {
-        try {
-          await authApi.logout();
-        } catch (error) {
-          // Ignore logout errors
-        } finally {
-          get().clearAuth();
-        }
-      },
+     logout: async () => {
+  try {
+    await authApi.logout();
+  } catch (error) {
+    // Ignore
+  } finally {
+    useSocketStore.getState().disconnect();
+    get().clearAuth();
+  }
+},
 
       logoutAll: async () => {
         try {

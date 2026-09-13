@@ -2,17 +2,29 @@ const ActivityQueries = require('../db/queries/activity.queries');
 const WorkspaceQueries = require('../db/queries/workspace.queries');
 const ProjectQueries = require('../db/queries/project.queries');
 const TaskQueries = require('../db/queries/task.queries');
+const { emitToWorkspace } = require('../config/socket');
 
 class ActivityService {
   async log(data) {
-    try {
-      const created = await ActivityQueries.create(data);
-      return created;
-    } catch (error) {
-      console.error('⚠️ Activity log failed:', error.message);
-      return null;
+  try {
+    const created = await ActivityQueries.create(data);
+
+    // Emit to workspace room
+    if (created && data.workspaceId) {
+      emitToWorkspace(data.workspaceId, 'activity:new', {
+        activity: this.enrichActivity({ ...created, ...data }),
+        workspaceId: data.workspaceId,
+        projectId: data.projectId,
+        taskId: data.taskId,
+      });
     }
+
+    return created;
+  } catch (error) {
+    console.error('⚠️ Activity log failed:', error.message);
+    return null;
   }
+}
 
   async getTaskActivities(taskId, userId, options = {}) {
     const task = await TaskQueries.findById(taskId);

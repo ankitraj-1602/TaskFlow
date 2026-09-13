@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { notificationApi } from '../api/notification.api';
+import toast from 'react-hot-toast';
 
 export const useNotificationStore = create((set, get) => ({
   notifications: [],
@@ -108,4 +109,18 @@ export const useNotificationStore = create((set, get) => ({
     if (id) clearInterval(id);
     set({ pollingInterval: null });
   },
+  addFromSocket: (notification) => {
+  set((state) => {
+    // Avoid dupe
+    if (state.notifications.find((n) => n.id === notification.id)) return state;
+
+    // Show toast
+    toast.success(notification.content, { icon: '🔔' });
+
+    return {
+      notifications: [notification, ...state.notifications].slice(0, 30),
+      unreadCount: state.unreadCount + 1,
+    };
+  });
+},
 }));

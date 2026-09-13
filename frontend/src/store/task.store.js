@@ -213,4 +213,37 @@ updateTaskStatus: async (taskId, status, position) => {
   clearTasks: () => {
     set({ tasks: [], currentTask: null, stats: null, pagination: null });
   },
+  // ─── Socket-driven updates ──────────────────────────
+addTaskFromSocket: (task) => {
+  set((state) => {
+    if (state.tasks.find((t) => t.id === task.id)) return state;
+    return { tasks: [task, ...state.tasks] };
+  });
+},
+
+updateTaskFromSocket: (task) => {
+  set((state) => ({
+    tasks: state.tasks.map((t) =>
+      t.id === task.id
+        ? { ...t, ...task } // merge to preserve any fields not sent
+        : t
+    ),
+    currentTask: state.currentTask?.id === task.id ? { ...state.currentTask, ...task } : state.currentTask,
+  }));
+},
+
+moveTaskFromSocket: (taskId, status, position) => {
+  set((state) => ({
+    tasks: state.tasks.map((t) =>
+      t.id === taskId ? { ...t, status, position } : t
+    ),
+  }));
+},
+
+removeTaskFromSocket: (taskId) => {
+  set((state) => ({
+    tasks: state.tasks.filter((t) => t.id !== taskId),
+    currentTask: state.currentTask?.id === taskId ? null : state.currentTask,
+  }));
+},
 }));

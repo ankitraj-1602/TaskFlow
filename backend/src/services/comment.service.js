@@ -8,6 +8,7 @@ const ActivityService = require('./activity.service');
 const activityService = new ActivityService();
 const NotificationService = require('./notification.service');
 const notificationService = new NotificationService();
+const { emitToWorkspace } = require('../config/socket');
 
 class CommentService {
   /**
@@ -135,6 +136,14 @@ if (
     commentId: created.id,
     projectId: project.id,
   });
+
+  emitToWorkspace(project.workspace_id, 'comment:created', {
+  comment: this.enrichCommentTree(fullComment),
+  taskId,
+  projectId: project.id,
+  workspaceId: project.workspace_id,
+  actorId: userId,
+});
 }
     // Re-fetch with author joins so the frontend gets full data
     const fullComment = await CommentQueries.findById(created.id);
@@ -179,6 +188,13 @@ if (
       await MentionQueries.createMany(commentId, mentionedUserIds);
     }
 
+    emitToWorkspace(project.workspace_id, 'comment:updated', {
+  comment: this.enrichCommentTree(fullComment),
+  taskId: comment.task_id,
+  projectId: project.id,
+  workspaceId: project.workspace_id,
+  actorId: userId,
+});
     // Re-fetch with author joins
     const fullComment = await CommentQueries.findById(commentId);
     return this.enrichCommentTree(fullComment);
@@ -203,6 +219,13 @@ if (
     }
 
     await CommentQueries.delete(commentId);
+    emitToWorkspace(project.workspace_id, 'comment:deleted', {
+  commentId,
+  taskId: comment.task_id,
+  projectId: project.id,
+  workspaceId: project.workspace_id,
+  actorId: userId,
+});
     return true;
   }
 

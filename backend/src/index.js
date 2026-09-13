@@ -4,6 +4,8 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
 require('dotenv').config();
+const http = require('http');
+const { initSocket } = require('./config/socket');
 
 const authRoutes = require('./routes/auth.routes');
 const commentRoutes = require('./routes/comment.routes');
@@ -69,7 +71,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+
+const server = http.createServer(app);
+initSocket(server);
+
+server.listen(PORT, () => {
   console.log(`🚀 TaskFlow backend running on http://localhost:${PORT}`);
   console.log(`🔐 Auth: /api/auth`);
   console.log(`🏢 Workspaces: /api/workspaces`);

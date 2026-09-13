@@ -5,6 +5,7 @@ const ActivityService = require('./activity.service');
 const activityService = new ActivityService();
 const NotificationService = require('./notification.service');
 const notificationService = new NotificationService();
+const { emitToWorkspace } = require('../config/socket');
 
 class TaskService {
   async createTask(projectId, userId, data) {
@@ -62,6 +63,12 @@ if (workspaceMemberId && data.assigneeId) {
     projectId,
   });
 }
+emitToWorkspace(project.workspace_id, 'task:created', {
+  task: this.enrichTask(task),
+  projectId,
+  workspaceId: project.workspace_id,
+  actorId: userId,
+});
 
   return this.enrichTask(task);
 }
@@ -269,6 +276,13 @@ async updateTask(taskId, userId, data) {
   }
 }
 
+emitToWorkspace(project.workspace_id, 'task:updated', {
+  task: this.enrichTask(fresh),
+  projectId: project.id,
+  workspaceId: project.workspace_id,
+  actorId: userId,
+});
+
   // Re-fetch with all joins
   const fresh = await TaskQueries.findById(taskId);
   return this.enrichTask(fresh);
@@ -322,6 +336,15 @@ async updateTaskStatus(taskId, userId, status, position) {
     }
   }
 
+  emitToWorkspace(project.workspace_id, 'task:moved', {
+  taskId,
+  status,
+  position,
+  projectId: project.id,
+  workspaceId: project.workspace_id,
+  actorId: userId,
+});
+
   const fresh = await TaskQueries.findById(taskId);
   return this.enrichTask(fresh);
 }
@@ -364,6 +387,13 @@ async updateTaskStatus(taskId, userId, status, position) {
     changes: { title: task.title },
   });
 
+  emitToWorkspace(project.workspace_id, 'task:deleted', {
+  taskId,
+  projectId: project.id,
+  workspaceId: project.workspace_id,
+  actorId: userId,
+});
+
     await TaskQueries.delete(taskId);
     return true;
   }
@@ -390,6 +420,13 @@ async updateTaskStatus(taskId, userId, status, position) {
     taskId,
   });
 
+  emitToWorkspace(project.workspace_id, 'task:archived', {
+  taskId,
+  projectId: project.id,
+  workspaceId: project.workspace_id,
+});
+
+
   return result;
   }
 
@@ -415,6 +452,13 @@ async updateTaskStatus(taskId, userId, status, position) {
     taskId,
   });
 
+  emitToWorkspace(project.workspace_id, 'task:unarchived', {
+  taskId,
+  projectId: project.id,
+  workspaceId: project.workspace_id,
+});
+
+// For unarchive: 'task:unarchived'
   return result;
   }
 
@@ -429,6 +473,13 @@ async updateTaskStatus(taskId, userId, status, position) {
     if (!hasAccess) {
       throw new Error('You do not have access to this task');
     }
+
+    emitToWorkspace(project.workspace_id, 'task:created', {
+  task: this.enrichTask(duplicated),
+  projectId: project.id,
+  workspaceId: project.workspace_id,
+  actorId: userId,
+});
 
     const duplicated = await TaskQueries.duplicate(taskId, userId);
     return this.enrichTask(duplicated);

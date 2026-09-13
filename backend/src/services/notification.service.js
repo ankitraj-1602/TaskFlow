@@ -1,17 +1,27 @@
 const NotificationQueries = require('../db/queries/notification.queries');
+const { emitToUser } = require('../config/socket');
 
 class NotificationService {
   /**
    * Create a notification. Fire-and-forget — never breaks the main flow.
    */
-  async create(data) {
-    try {
-      return await NotificationQueries.create(data);
-    } catch (error) {
-      console.error('⚠️ Notification creation failed:', error.message);
-      return null;
+async create(data) {
+  try {
+    const notification = await NotificationQueries.create(data);
+
+    // Emit real-time event to the recipient
+    if (notification) {
+      emitToUser(data.userId, 'notification:new', {
+        notification: this.enrichNotification(notification),
+      });
     }
+
+    return notification;
+  } catch (error) {
+    console.error('⚠️ Notification creation failed:', error.message);
+    return null;
   }
+}
 
   /**
    * Convenience: notify user that they were assigned to a task.
