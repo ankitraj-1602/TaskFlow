@@ -6,6 +6,8 @@ const WorkspaceQueries = require('../db/queries/workspace.queries');
 const UserQueries = require('../db/queries/user.queries');
 const ActivityService = require('./activity.service');
 const activityService = new ActivityService();
+const NotificationService = require('./notification.service');
+const notificationService = new NotificationService();
 
 class CommentService {
   /**
@@ -99,6 +101,39 @@ if (mentionedUserIds.length > 0) {
     taskId,
     commentId: created.id,
     changes: { mentionedCount: mentionedUserIds.length },
+  });
+}
+
+
+// Notify mentioned users
+for (const mentionedUserId of mentionedUserIds) {
+  await notificationService.notifyMention({
+    userId: mentionedUserId,
+    actorId: userId,
+    taskId,
+    taskTitle: task.title,
+    commentId: created.id,
+    projectId: project.id,
+  });
+}
+
+// Notify task assignee (if not the commenter and not already mentioned)
+const taskFull = await TaskQueries.findById(taskId);
+const members = await WorkspaceQueries.getMembers(project.workspace_id);
+const assignee = members.find((m) => m.id === taskFull.assignee_id);
+
+if (
+  assignee &&
+  assignee.user_id !== userId &&
+  !mentionedUserIds.includes(assignee.user_id)
+) {
+  await notificationService.notifyComment({
+    userId: assignee.user_id,
+    actorId: userId,
+    taskId,
+    taskTitle: task.title,
+    commentId: created.id,
+    projectId: project.id,
   });
 }
     // Re-fetch with author joins so the frontend gets full data

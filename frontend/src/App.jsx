@@ -20,6 +20,7 @@ import { ResetPassword } from './pages/ResetPassword';
 import { AcceptInvitation } from './pages/AcceptInvitation';
 import { Settings } from './pages/Settings';
 import { KanbanBoard } from './pages/KanbanBoard';
+import { Notifications } from './pages/Notifications';
 
 
 function App() {
@@ -76,7 +77,9 @@ function App() {
         <Route
   path="/workspaces/:workspaceId/projects/:projectId/board"
   element={<KanbanBoard />}
+  
 />
+<Route path="/notifications" element={<Notifications />} />
       </Routes>
     </Router>
   );

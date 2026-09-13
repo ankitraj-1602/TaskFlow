@@ -12,6 +12,7 @@ const projectRoutes = require('./routes/project.routes');
 const taskRoutes = require('./routes/task.routes');
 const invitationRoutes = require("./routes/invitation.routes")
 const activityRoutes = require('./routes/activity.routes');
+const notificationRoutes = require('./routes/notification.routes');
 const { apiRateLimiter } = require('./middleware/rateLimit.middleware');
 
 const app = express();
@@ -44,6 +45,7 @@ app.use('/api/workspaces', workspaceRoutes);
 app.use('/api', taskRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/invitations', invitationRoutes); 
+app.use('/api/notifications', notificationRoutes);
 app.use('/api', commentRoutes);  
 app.use('/api', activityRoutes);
 

@@ -1,22 +1,36 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useEffect, useState } from 'react';
 import { Menu, Transition } from '@headlessui/react';
-import { 
-  UserCircleIcon, 
-  ArrowRightOnRectangleIcon, 
+import {
+  UserCircleIcon,
+  ArrowRightOnRectangleIcon,
   Cog6ToothIcon,
-  BellIcon 
+  BellIcon,
 } from '@heroicons/react/24/outline';
-import { useAuthStore } from '../../store/auth.store';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../store/auth.store';
+import { useNotificationStore } from '../../store/notification.store';
+import { NotificationDropdown } from '../Notification/NotificationDropdown';
 
 export const Navbar = () => {
   const { user, logout } = useAuthStore();
+  const { unreadCount, startPolling, stopPolling } = useNotificationStore();
   const navigate = useNavigate();
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
+
+  // Start polling when logged in, stop on unmount
+  useEffect(() => {
+    if (user) {
+      startPolling(30000); // every 30 seconds
+    }
+    return () => {
+      stopPolling();
+    };
+  }, [user]);
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -27,12 +41,24 @@ export const Navbar = () => {
 
         <div className="flex items-center space-x-4">
           {/* Notification bell */}
-          <button className="text-gray-500 hover:text-gray-700 relative">
-            <BellIcon className="h-6 w-6" />
-            <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-              0
-            </span>
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications((v) => !v)}
+              className="text-gray-500 hover:text-gray-700 relative p-1"
+            >
+              <BellIcon className="h-6 w-6" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 bg-red-500 rounded-full text-white text-xs flex items-center justify-center font-semibold">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            <NotificationDropdown
+              isOpen={showNotifications}
+              onClose={() => setShowNotifications(false)}
+            />
+          </div>
 
           {/* User menu */}
           <Menu as="div" className="relative">
@@ -55,8 +81,16 @@ export const Navbar = () => {
                   {user?.name}
                 </span>
               </div>
-              <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+              <svg
+                className="h-5 w-5 text-gray-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
               </svg>
             </Menu.Button>
 

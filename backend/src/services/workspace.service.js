@@ -3,6 +3,8 @@ const UserQueries = require('../db/queries/user.queries');
 const InvitationQueries = require('../db/queries/invitation.queries'); 
 const { createWorkspaceInvitationToken } = require('../utils/token.utils');
 const emailService = require('./email.service');
+const NotificationService = require('./notification.service');
+const notificationService = new NotificationService();
 
 class WorkspaceService {
   async createWorkspace(userId, data) {
@@ -121,6 +123,15 @@ async addMember(workspaceId, userId, email, role = 'MEMBER') {
         userId
       );
 
+      if (userToAdd.id !== userId) {
+    await notificationService.notifyWorkspaceInvitation({
+      userId: userToAdd.id,
+      actorId: userId,
+      workspaceId,
+      workspaceName: workspace.name,
+    });
+  }
+
       return {
         type: 'added',
         member: {
@@ -237,8 +248,21 @@ async addMember(workspaceId, userId, email, role = 'MEMBER') {
       invitation.invited_by
     );
 
+
+
     // Mark invitation as accepted
     await InvitationQueries.accept(token, userId);
+
+    const acceptingUser = await UserQueries.findById(userId);
+  if (invitation.invited_by !== userId) {
+    await notificationService.create({
+      type: 'WORKSPACE_INVITATION',
+      content: `${acceptingUser.name} accepted your invitation to "${invitation.workspace_name}"`,
+      data: { workspaceId: invitation.workspace_id, workspaceName: invitation.workspace_name },
+      userId: invitation.invited_by,
+      actorId: userId,
+    });
+  }
 
     return {
       workspaceId: invitation.workspace_id,

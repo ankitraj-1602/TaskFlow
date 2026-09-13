@@ -3,6 +3,8 @@ const ProjectQueries = require('../db/queries/project.queries');
 const WorkspaceQueries = require('../db/queries/workspace.queries');
 const ActivityService = require('./activity.service');
 const activityService = new ActivityService();
+const NotificationService = require('./notification.service');
+const notificationService = new NotificationService();
 
 class TaskService {
   async createTask(projectId, userId, data) {
@@ -49,6 +51,17 @@ class TaskService {
     taskId: task.id,
     changes: { title: task.title },
   });
+
+  // After creating the task and logging activity
+if (workspaceMemberId && data.assigneeId) {
+  await notificationService.notifyTaskAssigned({
+    userId: data.assigneeId,             // user_id
+    actorId: userId,
+    taskId: task.id,
+    taskTitle: task.title,
+    projectId,
+  });
+}
 
   return this.enrichTask(task);
 }
@@ -241,6 +254,21 @@ async updateTask(taskId, userId, data) {
     });
   }
 
+  if (changes.assignee && changes.assignee.to) {
+  // Find the user_id for the new workspace_member_id
+  const members = await WorkspaceQueries.getMembers(project.workspace_id);
+  const newAssignee = members.find((m) => m.id === changes.assignee.to);
+  if (newAssignee) {
+    await notificationService.notifyTaskAssigned({
+      userId: newAssignee.user_id,
+      actorId: userId,
+      taskId,
+      taskTitle: updated.title,
+      projectId: project.id,
+    });
+  }
+}
+
   // Re-fetch with all joins
   const fresh = await TaskQueries.findById(taskId);
   return this.enrichTask(fresh);
@@ -278,6 +306,23 @@ async updateTaskStatus(taskId, userId, status, position) {
       changes: { from: oldPosition, to: position },
     });
   }
+
+  if (changes.status) {
+  // Notify the assignee (if different from actor)
+  const members = await WorkspaceQueries.getMembers(project.workspace_id);
+  const assignee = members.find((m) => m.id === task.assignee_id);
+  if (assignee && assignee.user_id !== userId) {
+    await notificationService.notifyStatusChanged({
+      userId: assignee.user_id,
+      actorId: userId,
+      taskId,
+      taskTitle: task.title,
+      from: changes.status.from,
+      to: changes.status.to,
+      projectId: project.id,
+    });
+  }
+}
 
   const fresh = await TaskQueries.findById(taskId);
   return this.enrichTask(fresh);
