@@ -14,6 +14,7 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,       // ⬅️ ADD THIS
 } from '@heroicons/react/24/outline';
+import { ActivityFeed } from '../components/Activity/ActivityFeed';
 
 const tabs = [
   { id: 'overview', name: 'Overview', icon: ChartBarIcon },
@@ -169,10 +170,19 @@ useEffect(() => {
             </div>
 
             {/* Recent Activity */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-              <p className="text-gray-500 text-sm">No recent activity to show</p>
-            </div>
+            {/* Recent Activity */}
+<div className="bg-white rounded-lg shadow p-6">
+  <div className="flex items-center justify-between mb-4">
+    <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+  </div>
+  <ActivityFeed
+    scope="workspace"
+    id={id}
+    limit={10}
+    compact
+    emptyMessage="No recent activity"
+  />
+</div>
           </div>
         )}
 

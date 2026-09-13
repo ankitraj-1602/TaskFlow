@@ -9,6 +9,8 @@ import { useTaskStore } from '../../store/task.store';
 import { useAuthStore } from '../../store/auth.store';
 import { useProjectStore } from '../../store/project.store';
 import { usePermission } from '../../hooks/usePermission';
+import { ActivityFeed } from '../Activity/ActivityFeed';
+import { useActivityStore } from '../../store/activity.store';
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -29,6 +31,7 @@ export const TaskDetailModal = ({
   const { user } = useAuthStore();
   const { loadProjectMembers } = useProjectStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { invalidateTask } = useActivityStore();
 
   // ─── RBAC ─────────────────────────────────────────
   const { isMember, isManager } = usePermission(workspaceRole);
@@ -48,11 +51,15 @@ export const TaskDetailModal = ({
   // ──────────────────────────────────────────────────
 
   // ─── Load project members for @mention autocomplete
-  useEffect(() => {
-    if (isOpen && task?.projectId) {
-      loadProjectMembers(task.projectId);
-    }
-  }, [isOpen, task?.projectId]);
+useEffect(() => {
+  if (isOpen && task?.projectId) {
+    loadProjectMembers(task.projectId);
+  }
+  if (isOpen && task?.id) {
+    // Refresh activity every time the modal opens
+    invalidateTask(task.id);
+  }
+}, [isOpen, task?.projectId, task?.id]);
   // ──────────────────────────────────────────────────
 
   if (!task) return null;
@@ -198,6 +205,10 @@ export const TaskDetailModal = ({
         <div className="pt-4 border-t border-gray-200">
           <CommentList taskId={task.id} workspaceRole={workspaceRole} />
         </div>
+        <div className="pt-4 border-t border-gray-200">
+  <h4 className="text-sm font-semibold text-gray-900 mb-2">Activity</h4>
+  <ActivityFeed scope="task" id={task.id} compact />
+</div>
 
         {/* Actions */}
         {hasAnyAction ? (

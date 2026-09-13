@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/UI/StatusBadge';
 import { ProjectMembersTab } from '../components/Project/ProjectMembersTab';
 import { useProjectStore } from '../store/project.store';
 import { useWorkspaceStore } from '../store/workspace.store';
+import { ActivityFeed } from '../components/Activity/ActivityFeed';
 import {
   ArrowLeftIcon,
   Cog6ToothIcon,
@@ -22,6 +23,7 @@ import {
 
 const tabs = [
   { id: 'overview', name: 'Overview', icon: ChartBarIcon },
+  { id: 'activity', name: 'Activity', icon: ClockIcon },      // ⬅️ NEW
   { id: 'members', name: 'Members', icon: UserGroupIcon },
 ];
 
@@ -237,6 +239,14 @@ export const ProjectDetail = () => {
     projectId={projectId}
     workspaceRole={workspaceRole}
   />
+)}
+{activeTab === 'activity' && (
+  <div className="bg-white rounded-lg shadow p-6">
+    <div className="flex items-center justify-between mb-4">
+      <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+    </div>
+    <ActivityFeed scope="project" id={projectId} limit={50} showRefresh />
+  </div>
 )}
       </div>
     </ProtectedLayout>

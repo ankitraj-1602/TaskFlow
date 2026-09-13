@@ -4,59 +4,54 @@ const ProjectQueries = require('../db/queries/project.queries');
 const TaskQueries = require('../db/queries/task.queries');
 
 class ActivityService {
-  /**
-   * Record an activity. Called by other services after successful mutations.
-   * Swallows errors so logging never breaks the main flow.
-   */
   async log(data) {
     try {
       const created = await ActivityQueries.create(data);
       return created;
     } catch (error) {
-      // Never let logging break the main operation
       console.error('⚠️ Activity log failed:', error.message);
       return null;
     }
   }
 
-  /**
-   * Fetch activities for a task.
-   */
   async getTaskActivities(taskId, userId, options = {}) {
     const task = await TaskQueries.findById(taskId);
     if (!task) throw new Error('Task not found');
 
     const project = await ProjectQueries.findById(task.project_id);
-    const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+    const hasAccess = await this.checkWorkspaceAccess(
+      project.workspace_id,
+      userId
+    );
     if (!hasAccess) throw new Error('You do not have access to this task');
 
     const activities = await ActivityQueries.findByTask(taskId, options);
-    return activities.map(this.enrichActivity);
+    return activities.map((a) => this.enrichActivity(a));
   }
 
-  /**
-   * Fetch activities for a project.
-   */
   async getProjectActivities(projectId, userId, options = {}) {
     const project = await ProjectQueries.findById(projectId);
     if (!project) throw new Error('Project not found');
 
-    const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+    const hasAccess = await this.checkWorkspaceAccess(
+      project.workspace_id,
+      userId
+    );
     if (!hasAccess) throw new Error('You do not have access to this project');
 
     const activities = await ActivityQueries.findByProject(projectId, options);
-    return activities.map(this.enrichActivity);
+    return activities.map((a) => this.enrichActivity(a));
   }
 
-  /**
-   * Fetch activities for a workspace.
-   */
   async getWorkspaceActivities(workspaceId, userId, options = {}) {
     const hasAccess = await this.checkWorkspaceAccess(workspaceId, userId);
     if (!hasAccess) throw new Error('You do not have access to this workspace');
 
-    const activities = await ActivityQueries.findByWorkspace(workspaceId, options);
-    return activities.map(this.enrichActivity);
+    const activities = await ActivityQueries.findByWorkspace(
+      workspaceId,
+      options
+    );
+    return activities.map((a) => this.enrichActivity(a));
   }
 
   // ─── Helpers ───────────────────────────────────────
@@ -81,9 +76,6 @@ class ActivityService {
     };
   }
 
-  /**
-   * Build a human-readable description of the activity.
-   */
   buildDescription(row) {
     const actor = row.user_name || 'Someone';
     const task = row.task_title ? `"${row.task_title}"` : 'a task';
@@ -97,9 +89,9 @@ class ActivityService {
       case 'DELETED':
         return `${actor} deleted ${task}`;
       case 'ASSIGNED':
-        return `${actor} assigned ${task} to ${changes.to || 'someone'}`;
+        return `${actor} assigned ${task}`;
       case 'REASSIGNED':
-        return `${actor} reassigned ${task} from ${changes.from || 'someone'} to ${changes.to || 'someone'}`;
+        return `${actor} reassigned ${task}`;
       case 'STATUS_CHANGED':
         return `${actor} changed status of ${task} from ${changes.from || '?'} to ${changes.to || '?'}`;
       case 'PRIORITY_CHANGED':

@@ -95,8 +95,8 @@ class TaskService {
     return tasks.map(this.enrichTask);
   }
 
- async updateTask(taskId, userId, data) {
- const task = await TaskQueries.findById(taskId);
+async updateTask(taskId, userId, data) {
+  const task = await TaskQueries.findById(taskId);
   if (!task) {
     throw new Error('Task not found');
   }
@@ -108,11 +108,9 @@ class TaskService {
     throw new Error('You do not have access to this task');
   }
 
-  // RBAC: MEMBER can only edit tasks they created or are assigned to
-  const isOwnTask = 
-    task.created_by_id === userId || 
-    task.assignee_user_id === userId;
-
+  // RBAC
+  const isOwnTask =
+    task.created_by_id === userId || task.assignee_user_id === userId;
   const canEditAnyTask = ['MANAGER', 'ADMIN', 'OWNER'].includes(workspaceRole);
   const canEditOwnTask = workspaceRole === 'MEMBER' && isOwnTask;
 
@@ -120,32 +118,83 @@ class TaskService {
     throw new Error('You do not have permission to edit this task');
   }
 
+  // ⬇️ Outer scope for change tracking
+  const changes = {};
   const updateData = {};
-  if (data.title !== undefined) updateData.title = data.title;
-  if (data.description !== undefined) updateData.description = data.description;
-  if (data.status !== undefined) updateData.status = data.status;
-  if (data.priority !== undefined) updateData.priority = data.priority;
-  if (data.dueDate !== undefined) updateData.due_date = data.dueDate;
-  if (data.storyPoints !== undefined) updateData.story_points = data.storyPoints;
-  if (data.metadata !== undefined) updateData.metadata = data.metadata;
 
-  // Handle assignee
+  // ─── Title ────────────────────────────────────────
+  if (data.title !== undefined && data.title !== task.title) {
+    updateData.title = data.title;
+    changes.title = { from: task.title, to: data.title };
+  }
+
+  // ─── Description ──────────────────────────────────
+  if (data.description !== undefined) {
+    updateData.description = data.description;
+    // Not tracked as a change (often noisy) — add if you want
+  }
+
+  // ─── Status ───────────────────────────────────────
+  if (data.status !== undefined && data.status !== task.status) {
+    updateData.status = data.status;
+    changes.status = { from: task.status, to: data.status };
+  }
+
+  // ─── Priority ─────────────────────────────────────
+  if (data.priority !== undefined && data.priority !== task.priority) {
+    updateData.priority = data.priority;
+    changes.priority = { from: task.priority, to: data.priority };
+  }
+
+  // ─── Due Date ─────────────────────────────────────
+  if (data.dueDate !== undefined) {
+    updateData.due_date = data.dueDate;
+  }
+
+  // ─── Story Points ─────────────────────────────────
+  if (data.storyPoints !== undefined) {
+    updateData.story_points = data.storyPoints;
+  }
+
+  // ─── Metadata ─────────────────────────────────────
+  if (data.metadata !== undefined) {
+    updateData.metadata = data.metadata;
+  }
+
+  // ─── Assignee ─────────────────────────────────────
   if (data.assigneeId !== undefined) {
-    if (data.assigneeId === null) {
-      updateData.assignee_id = null;
-    } else {
+    // Resolve target (user_id → workspace_member_id or null)
+    let newAssigneeId = null;
+
+    if (data.assigneeId !== null && data.assigneeId !== '') {
       const members = await WorkspaceQueries.getMembers(project.workspace_id);
-      const workspaceMember = members.find(m => m.user_id === data.assigneeId);
+      const workspaceMember = members.find(
+        (m) => m.user_id === data.assigneeId
+      );
       if (!workspaceMember) {
         throw new Error('Assignee is not a member of this workspace');
       }
-      updateData.assignee_id = workspaceMember.id;
+      newAssigneeId = workspaceMember.id;
     }
+
+    // ⬇️ Only update + log if the value ACTUALLY changed
+    const oldAssigneeId = task.assignee_id || null;
+
+    if (oldAssigneeId !== newAssigneeId) {
+      updateData.assignee_id = newAssigneeId;
+      changes.assignee = {
+        from: oldAssigneeId,
+        to: newAssigneeId,
+      };
+    }
+    // If unchanged → skip update + skip logging
   }
 
+  // ─── Persist ──────────────────────────────────────
   const updated = await TaskQueries.update(taskId, updateData);
 
-   if (changes.status) {
+  // ─── Log activities ───────────────────────────────
+  if (changes.status) {
     await activityService.log({
       action: 'STATUS_CHANGED',
       userId,
@@ -155,6 +204,7 @@ class TaskService {
       changes: changes.status,
     });
   }
+
   if (changes.priority) {
     await activityService.log({
       action: 'PRIORITY_CHANGED',
@@ -165,6 +215,7 @@ class TaskService {
       changes: changes.priority,
     });
   }
+
   if (changes.assignee) {
     await activityService.log({
       action: task.assignee_id ? 'REASSIGNED' : 'ASSIGNED',
@@ -175,9 +226,11 @@ class TaskService {
       changes: changes.assignee,
     });
   }
-  if (changes.title || changes.status || changes.priority || changes.assignee) {
-    // already logged specific; skip generic UPDATED
-  } else {
+
+  // Generic update log — only if no specific changes were logged
+  const hasSpecificChange =
+    changes.status || changes.priority || changes.assignee;
+  if (!hasSpecificChange && Object.keys(changes).length > 0) {
     await activityService.log({
       action: 'UPDATED',
       userId,
@@ -188,25 +241,24 @@ class TaskService {
     });
   }
 
-  return this.enrichTask(updated);
+  // Re-fetch with all joins
+  const fresh = await TaskQueries.findById(taskId);
+  return this.enrichTask(fresh);
 }
-  async updateTaskStatus(taskId, userId, status, position) {
-    const task = await TaskQueries.findById(taskId);
-    if (!task) {
-      throw new Error('Task not found');
-    }
+async updateTaskStatus(taskId, userId, status, position) {
+  const task = await TaskQueries.findById(taskId);
+  if (!task) throw new Error('Task not found');
 
-    const project = await ProjectQueries.findById(task.project_id);
-    const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
-    if (!hasAccess) {
-      throw new Error('You do not have access to this task');
-    }
+  const project = await ProjectQueries.findById(task.project_id);
+  const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+  if (!hasAccess) throw new Error('You do not have access to this task');
 
-     const oldStatus = task.status;
+  const oldStatus = task.status;
+  const oldPosition = task.position;
 
   await TaskQueries.updateStatus(taskId, status, position);
 
-  // ⬇️ Log
+  // Log activity — use inline object, no need for outer `changes`
   if (oldStatus !== status) {
     await activityService.log({
       action: status === 'DONE' ? 'COMPLETED' : 'STATUS_CHANGED',
@@ -214,7 +266,16 @@ class TaskService {
       workspaceId: project.workspace_id,
       projectId: project.id,
       taskId,
-      changes: { from: oldStatus, to: status },
+      changes: { from: oldStatus, to: status },   // ✅ inline object
+    });
+  } else if (oldPosition !== position) {
+    await activityService.log({
+      action: 'MOVED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId: project.id,
+      taskId,
+      changes: { from: oldPosition, to: position },
     });
   }
 
