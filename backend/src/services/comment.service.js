@@ -4,6 +4,8 @@ const TaskQueries = require('../db/queries/task.queries');
 const ProjectQueries = require('../db/queries/project.queries');
 const WorkspaceQueries = require('../db/queries/workspace.queries');
 const UserQueries = require('../db/queries/user.queries');
+const ActivityService = require('./activity.service');
+const activityService = new ActivityService();
 
 class CommentService {
   /**
@@ -65,6 +67,7 @@ class CommentService {
       authorId: userId,
       parentId: data.parentId,
     });
+    
 
     // Save mentions
     const emails = this.extractMentionEmails(data.content);
@@ -76,6 +79,28 @@ class CommentService {
       await MentionQueries.createMany(created.id, mentionedUserIds);
     }
 
+    
+await activityService.log({
+  action: 'COMMENTED',
+  userId,
+  workspaceId: project.workspace_id,
+  projectId: project.id,
+  taskId,
+  commentId: created.id,
+});
+
+// If there are mentions, log them too
+if (mentionedUserIds.length > 0) {
+  await activityService.log({
+    action: 'MENTIONED',
+    userId,
+    workspaceId: project.workspace_id,
+    projectId: project.id,
+    taskId,
+    commentId: created.id,
+    changes: { mentionedCount: mentionedUserIds.length },
+  });
+}
     // Re-fetch with author joins so the frontend gets full data
     const fullComment = await CommentQueries.findById(created.id);
     return this.enrichCommentTree(fullComment);

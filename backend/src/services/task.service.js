@@ -1,6 +1,8 @@
 const TaskQueries = require('../db/queries/task.queries');
 const ProjectQueries = require('../db/queries/project.queries');
 const WorkspaceQueries = require('../db/queries/workspace.queries');
+const ActivityService = require('./activity.service');
+const activityService = new ActivityService();
 
 class TaskService {
   async createTask(projectId, userId, data) {
@@ -37,6 +39,15 @@ class TaskService {
     assigneeId: workspaceMemberId,
     reporterId: userId,
     metadata: data.metadata,
+  });
+
+  await activityService.log({
+    action: 'CREATED',
+    userId,
+    workspaceId: project.workspace_id,
+    projectId,
+    taskId: task.id,
+    changes: { title: task.title },
   });
 
   return this.enrichTask(task);
@@ -133,6 +144,50 @@ class TaskService {
   }
 
   const updated = await TaskQueries.update(taskId, updateData);
+
+   if (changes.status) {
+    await activityService.log({
+      action: 'STATUS_CHANGED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId: project.id,
+      taskId,
+      changes: changes.status,
+    });
+  }
+  if (changes.priority) {
+    await activityService.log({
+      action: 'PRIORITY_CHANGED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId: project.id,
+      taskId,
+      changes: changes.priority,
+    });
+  }
+  if (changes.assignee) {
+    await activityService.log({
+      action: task.assignee_id ? 'REASSIGNED' : 'ASSIGNED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId: project.id,
+      taskId,
+      changes: changes.assignee,
+    });
+  }
+  if (changes.title || changes.status || changes.priority || changes.assignee) {
+    // already logged specific; skip generic UPDATED
+  } else {
+    await activityService.log({
+      action: 'UPDATED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId: project.id,
+      taskId,
+      changes,
+    });
+  }
+
   return this.enrichTask(updated);
 }
   async updateTaskStatus(taskId, userId, status, position) {
@@ -147,9 +202,27 @@ class TaskService {
       throw new Error('You do not have access to this task');
     }
 
-    const updated = await TaskQueries.updateStatus(taskId, status, position);
-    return this.enrichTask(updated);
+     const oldStatus = task.status;
+
+  await TaskQueries.updateStatus(taskId, status, position);
+
+  // ⬇️ Log
+  if (oldStatus !== status) {
+    await activityService.log({
+      action: status === 'DONE' ? 'COMPLETED' : 'STATUS_CHANGED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId: project.id,
+      taskId,
+      changes: { from: oldStatus, to: status },
+    });
   }
+
+  const fresh = await TaskQueries.findById(taskId);
+  return this.enrichTask(fresh);
+}
+    // return this.enrichTask(updated);
+//   }
 
   async reorderTasks(projectId, userId, status, taskIds) {
     const project = await ProjectQueries.findById(projectId);
@@ -178,6 +251,15 @@ class TaskService {
       throw new Error('You do not have access to this task');
     }
 
+    await activityService.log({
+    action: 'DELETED',
+    userId,
+    workspaceId: project.workspace_id,
+    projectId: project.id,
+    taskId,
+    changes: { title: task.title },
+  });
+
     await TaskQueries.delete(taskId);
     return true;
   }
@@ -194,7 +276,17 @@ class TaskService {
       throw new Error('You do not have access to this task');
     }
 
-    return TaskQueries.archive(taskId);
+    const result = await TaskQueries.archive(taskId);
+
+  await activityService.log({
+    action: 'ARCHIVED',
+    userId,
+    workspaceId: project.workspace_id,
+    projectId: project.id,
+    taskId,
+  });
+
+  return result;
   }
 
   async unarchiveTask(taskId, userId) {
@@ -209,7 +301,17 @@ class TaskService {
       throw new Error('You do not have access to this task');
     }
 
-    return TaskQueries.unarchive(taskId);
+    const result = await TaskQueries.unarchive(taskId);
+
+  await activityService.log({
+    action: 'RESTORED',
+    userId,
+    workspaceId: project.workspace_id,
+    projectId: project.id,
+    taskId,
+  });
+
+  return result;
   }
 
   async duplicateTask(taskId, userId) {
