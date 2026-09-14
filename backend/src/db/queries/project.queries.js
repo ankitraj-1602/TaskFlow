@@ -241,6 +241,33 @@ static async removeMemberById(projectId, memberId) {
   const result = await QueryHelper.query(query, [memberId, projectId]);
   return result.rows[0] || null;
 }
+static async findAllForUser(userId) {
+  const query = `
+    SELECT DISTINCT
+      p.id, p.name, p.description, p.status, p.start_date, p.due_date,
+      p.created_at, p.updated_at,
+      w.id as workspace_id, w.name as workspace_name,
+      (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND is_archived = FALSE) as task_count,
+      (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'DONE' AND is_archived = FALSE) as completed_task_count,
+      (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count,
+      u.name as owner_name
+    FROM projects p
+    JOIN workspaces w ON p.workspace_id = w.id
+    LEFT JOIN users u ON p.owner_id = u.id
+    WHERE p.deleted_at IS NULL
+      AND w.deleted_at IS NULL
+      AND (
+        w.owner_id = $1
+        OR EXISTS (
+          SELECT 1 FROM workspace_members wm
+          WHERE wm.workspace_id = w.id AND wm.user_id = $1
+        )
+      )
+    ORDER BY w.name ASC, p.created_at DESC
+  `;
+  const result = await QueryHelper.query(query, [userId]);
+  return result.rows;
+}
 }
 
 module.exports = ProjectQueries;

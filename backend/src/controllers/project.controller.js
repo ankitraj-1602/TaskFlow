@@ -175,6 +175,15 @@ static async addProjectMember(req, res) {
     errorResponse(res, error.message, 403);
   }
 }
+static async getMyProjects(req, res) {
+  try {
+    const userId = req.user.userId;
+    const projects = await projectService.getAllMyProjects(userId);
+    successResponse(res, projects, 'Projects retrieved successfully');
+  } catch (error) {
+    errorResponse(res, error.message, 500);
+  }
+}
 }
 
 module.exports = ProjectController;

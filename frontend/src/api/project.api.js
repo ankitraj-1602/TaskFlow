@@ -60,4 +60,7 @@ addMember: (projectId, data) => {
 removeMember: (projectId, memberId) => {
   return apiClient.delete(`/projects/${projectId}/members/${memberId}`).then(res => res.data.data);
 },
+getAllMyProjects: () => {
+  return apiClient.get('/me/projects').then((res) => res.data.data);
+},
 };

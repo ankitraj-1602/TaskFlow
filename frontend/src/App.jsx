@@ -23,6 +23,7 @@ import { KanbanBoard } from './pages/KanbanBoard';
 import { Notifications } from './pages/Notifications';
 import { useSocketStore } from './store/socket.store';
 import { useSocketEvents } from './hooks/useSocketEvents';
+import { ProjectsList } from './pages/ProjectsList';
 
 
 function App() {
@@ -92,6 +93,7 @@ function App() {
   
 />
 <Route path="/notifications" element={<Notifications />} />
+<Route path="/projects" element={<ProjectsList />} />
       </Routes>
     </Router>
   );

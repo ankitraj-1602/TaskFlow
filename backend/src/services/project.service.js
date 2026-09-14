@@ -297,6 +297,24 @@ async getWorkspaceRole(workspaceId, userId) {
   // Filter out those already in the project
   return workspaceMembers.filter(m => !projectMemberUserIds.has(m.user_id));
 }
+async getAllMyProjects(userId) {
+  const rows = await ProjectQueries.findAllForUser(userId);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    status: row.status,
+    startDate: row.start_date,
+    dueDate: row.due_date,
+    workspaceId: row.workspace_id,
+    workspaceName: row.workspace_name,
+    taskCount: parseInt(row.task_count || 0),
+    completedTaskCount: parseInt(row.completed_task_count || 0),
+    memberCount: parseInt(row.member_count || 0),
+    ownerName: row.owner_name,
+    createdAt: row.created_at,
+  }));
+}
 }
 
 module.exports = ProjectService;

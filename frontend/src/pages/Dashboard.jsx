@@ -1,82 +1,197 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { ProtectedLayout } from '../components/Layout/ProtectedLayout';
-import { useAuthStore } from '../store/auth.store';
 import { EmailVerificationBanner } from '../components/UI/EmailVerificationBanner';
+import { OverviewCards } from '../components/Dashboard/OverviewCards';
+import { TrendChart } from '../components/Dashboard/TrendChart';
+import { PriorityChart } from '../components/Dashboard/PriorityChart';
+import { StatusChart } from '../components/Dashboard/StatusChart';
+import { TeamProductivity } from '../components/Dashboard/TeamProductivity';
+import { ProjectProgressList } from '../components/Dashboard/ProjectProgressList';
+import { OverdueList } from '../components/Dashboard/OverdueList';
+import { useAuthStore } from '../store/auth.store';
+import { useWorkspaceStore } from '../store/workspace.store';
+import { useDashboardStore } from '../store/dashboard.store';
 import {
-  FolderIcon,
-  ClipboardDocumentListIcon,
-  CheckCircleIcon,
+  ChartBarIcon,
   UsersIcon,
-  ClockIcon,
-  CalendarDaysIcon,
+  FolderIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-
-const stats = [
-  { label: 'Total Projects', value: '0', icon: FolderIcon, color: 'bg-blue-50', iconColor: 'text-blue-600' },
-  { label: 'Tasks', value: '0', icon: ClipboardDocumentListIcon, color: 'bg-emerald-50', iconColor: 'text-emerald-600' },
-  { label: 'Completed', value: '0', icon: CheckCircleIcon, color: 'bg-violet-50', iconColor: 'text-violet-600' },
-  { label: 'Team Members', value: '0', icon: UsersIcon, color: 'bg-amber-50', iconColor: 'text-amber-600' },
-];
 
 export const Dashboard = () => {
   const { user } = useAuthStore();
+  const { workspaces, loadWorkspaces } = useWorkspaceStore();
+  const {
+    stats,
+    trends,
+    team,
+    projects,
+    overdue,
+    trendsRange,
+    isLoading,
+    loadDashboard,
+    changeTrendsRange,
+  } = useDashboardStore();
+
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null);
+
+  // Load workspaces on mount
+  useEffect(() => {
+    loadWorkspaces()
+      .then((list) => {
+        if (list.length > 0 && !selectedWorkspaceId) {
+          setSelectedWorkspaceId(list[0].id);
+        }
+      })
+      .catch(() => toast.error('Failed to load workspaces'));
+  }, []);
+
+  // Load dashboard when workspace changes
+  useEffect(() => {
+    if (selectedWorkspaceId) {
+      loadDashboard(selectedWorkspaceId).catch(() =>
+        toast.error('Failed to load dashboard')
+      );
+    }
+  }, [selectedWorkspaceId]);
+
+  const handleRangeChange = async (days) => {
+    try {
+      await changeTrendsRange(days);
+    } catch (error) {
+      toast.error('Failed to load trends');
+    }
+  };
 
   return (
     <ProtectedLayout>
-      <div className="space-y-8">
-        {/* Email Verification Banner (shows only if unverified) */}
+      <div className="space-y-6">
         <EmailVerificationBanner />
 
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
-            Welcome back, {user?.name}!
-          </h2>
-          <p className="text-gray-500 mt-1">
-            Here's what's happening with your projects today.
-          </p>
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              Welcome back, {user?.name}!
+            </h2>
+            <p className="text-gray-600 mt-1">
+              {stats?.overview?.recentActivityCount > 0
+                ? `${stats.overview.recentActivityCount} activities in the last 24h`
+                : "Here's what's happening in your workspace"}
+            </p>
+          </div>
+
+          {/* Workspace Selector */}
+          {workspaces.length > 0 && (
+            <select
+              value={selectedWorkspaceId || ''}
+              onChange={(e) => setSelectedWorkspaceId(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            >
+              {workspaces.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {stats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <div key={index} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <div className="flex items-center">
-                  <div className={`${stat.color} h-11 w-11 rounded-xl flex items-center justify-center`}>
-                    <Icon className={`h-5 w-5 ${stat.iconColor}`} />
-                  </div>
-                  <div className="ml-3.5">
-                    <p className="text-sm text-gray-500">{stat.label}</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
-                  </div>
+        {/* Empty state */}
+        {workspaces.length === 0 && !isLoading && (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <FolderIcon className="h-16 w-16 mx-auto text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900">
+              No workspaces yet
+            </h3>
+            <p className="text-gray-500 mt-1">
+              Create a workspace to see your dashboard
+            </p>
+          </div>
+        )}
+
+        {/* Loading state */}
+        {isLoading && !stats && (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          </div>
+        )}
+
+        {/* Dashboard content */}
+        {stats && (
+          <>
+            {/* Overview Cards */}
+            <OverviewCards stats={stats} />
+
+            {/* Trend + Priority */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <ChartBarIcon className="h-5 w-5 text-indigo-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Task Trends
+                  </h3>
                 </div>
+                <TrendChart
+                  data={trends}
+                  range={trendsRange}
+                  onRangeChange={handleRangeChange}
+                />
               </div>
-            );
-          })}
-        </div>
 
-        {/* Placeholder for charts and recent activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">
-              Recent Activity
-            </h3>
-            <div className="text-center py-10">
-              <ClockIcon className="h-7 w-7 text-gray-300 mx-auto" />
-              <p className="text-gray-500 text-sm mt-3">No recent activity to show.</p>
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  By Priority
+                </h3>
+                <PriorityChart data={stats.byPriority} />
+              </div>
             </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">
-              Upcoming Tasks
-            </h3>
-            <div className="text-center py-10">
-              <CalendarDaysIcon className="h-7 w-7 text-gray-300 mx-auto" />
-              <p className="text-gray-500 text-sm mt-3">No upcoming tasks.</p>
+
+            {/* Status + Team */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  By Status
+                </h3>
+                <StatusChart data={stats.byStatus} />
+              </div>
+
+              <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <UsersIcon className="h-5 w-5 text-indigo-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Team Productivity
+                  </h3>
+                </div>
+                <TeamProductivity data={team} />
+              </div>
             </div>
-          </div>
-        </div>
+
+            {/* Projects + Overdue */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Project Progress
+                </h3>
+                <ProjectProgressList
+                  data={projects}
+                  workspaceId={selectedWorkspaceId}
+                />
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Overdue Tasks
+                  </h3>
+                </div>
+                <OverdueList data={overdue} />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </ProtectedLayout>
   );
