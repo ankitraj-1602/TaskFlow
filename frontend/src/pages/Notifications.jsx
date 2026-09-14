@@ -56,7 +56,7 @@ export const Notifications = () => {
 
   return (
     <ProtectedLayout>
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Notifications</h2>

@@ -134,35 +134,35 @@ class WorkspaceQueries {
     return result.rows[0]?.role || null;
   }
 
-static async updateMemberRole(workspaceId, memberId, role) {
-  // memberId is workspace_members.id
-  const query = `
+  static async updateMemberRole(workspaceId, memberId, role) {
+    // memberId is workspace_members.id
+    const query = `
     UPDATE workspace_members 
     SET role = $1 
     WHERE id = $2 AND workspace_id = $3
     RETURNING id, workspace_id, user_id, role, joined_at
   `;
-  const result = await QueryHelper.query(query, [role, memberId, workspaceId]);
-  return result.rows[0] || null;
-}
-static async removeMemberById(workspaceId, memberId) {
-  const query = `
+    const result = await QueryHelper.query(query, [role, memberId, workspaceId]);
+    return result.rows[0] || null;
+  }
+  static async removeMemberById(workspaceId, memberId) {
+    const query = `
     DELETE FROM workspace_members 
     WHERE id = $1 AND workspace_id = $2
     RETURNING id
   `;
-  const result = await QueryHelper.query(query, [memberId, workspaceId]);
-  return result.rows[0] || null;
-}
-static async findMemberById(workspaceId, memberId) {
-  const query = `
+    const result = await QueryHelper.query(query, [memberId, workspaceId]);
+    return result.rows[0] || null;
+  }
+  static async findMemberById(workspaceId, memberId) {
+    const query = `
     SELECT wm.id, wm.role, wm.user_id
     FROM workspace_members wm
     WHERE wm.id = $1 AND wm.workspace_id = $2
   `;
-  const result = await QueryHelper.query(query, [memberId, workspaceId]);
-  return result.rows[0] || null;
-}
+    const result = await QueryHelper.query(query, [memberId, workspaceId]);
+    return result.rows[0] || null;
+  }
 
   static async isMember(workspaceId, userId) {
     const query = `
@@ -180,6 +180,29 @@ static async findMemberById(workspaceId, memberId) {
     `;
     const result = await QueryHelper.query(query, [workspaceId, userId]);
     return result.rows.length > 0;
+  }
+  static async findAllMembersForUser(userId) {
+    const query = `
+    SELECT DISTINCT
+      w.id as workspace_id, w.name as workspace_name,
+      wm.id as member_id, wm.role, wm.joined_at,
+      u.id as user_id, u.name, u.email, u.profile_picture, u.job_title
+    FROM workspaces w
+    JOIN workspace_members wm ON wm.workspace_id = w.id
+    JOIN users u ON wm.user_id = u.id
+    WHERE w.deleted_at IS NULL
+      AND u.deleted_at IS NULL
+      AND (
+        w.owner_id = $1
+        OR EXISTS (
+          SELECT 1 FROM workspace_members wm2
+          WHERE wm2.workspace_id = w.id AND wm2.user_id = $1
+        )
+      )
+    ORDER BY w.name ASC, u.name ASC
+  `;
+    const result = await QueryHelper.query(query, [userId]);
+    return result.rows;
   }
 }
 

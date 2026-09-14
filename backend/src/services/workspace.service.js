@@ -1,6 +1,6 @@
 const WorkspaceQueries = require('../db/queries/workspace.queries');
 const UserQueries = require('../db/queries/user.queries');
-const InvitationQueries = require('../db/queries/invitation.queries'); 
+const InvitationQueries = require('../db/queries/invitation.queries');
 const { createWorkspaceInvitationToken } = require('../utils/token.utils');
 const emailService = require('./email.service');
 const NotificationService = require('./notification.service');
@@ -53,7 +53,7 @@ class WorkspaceService {
 
     // Get user's role
     const role = await WorkspaceQueries.getUserRole(workspaceId, userId);
-    
+
     return {
       ...workspace,
       userRole: isOwner ? 'OWNER' : role,
@@ -90,7 +90,7 @@ class WorkspaceService {
     return true;
   }
 
-async addMember(workspaceId, userId, email, role = 'MEMBER') {
+  async addMember(workspaceId, userId, email, role = 'MEMBER') {
     // Check if user is owner or admin
     const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
@@ -124,13 +124,13 @@ async addMember(workspaceId, userId, email, role = 'MEMBER') {
       );
 
       if (userToAdd.id !== userId) {
-    await notificationService.notifyWorkspaceInvitation({
-      userId: userToAdd.id,
-      actorId: userId,
-      workspaceId,
-      workspaceName: workspace.name,
-    });
-  }
+        await notificationService.notifyWorkspaceInvitation({
+          userId: userToAdd.id,
+          actorId: userId,
+          workspaceId,
+          workspaceName: workspace.name,
+        });
+      }
 
       return {
         type: 'added',
@@ -254,15 +254,15 @@ async addMember(workspaceId, userId, email, role = 'MEMBER') {
     await InvitationQueries.accept(token, userId);
 
     const acceptingUser = await UserQueries.findById(userId);
-  if (invitation.invited_by !== userId) {
-    await notificationService.create({
-      type: 'WORKSPACE_INVITATION',
-      content: `${acceptingUser.name} accepted your invitation to "${invitation.workspace_name}"`,
-      data: { workspaceId: invitation.workspace_id, workspaceName: invitation.workspace_name },
-      userId: invitation.invited_by,
-      actorId: userId,
-    });
-  }
+    if (invitation.invited_by !== userId) {
+      await notificationService.create({
+        type: 'WORKSPACE_INVITATION',
+        content: `${acceptingUser.name} accepted your invitation to "${invitation.workspace_name}"`,
+        data: { workspaceId: invitation.workspace_id, workspaceName: invitation.workspace_name },
+        userId: invitation.invited_by,
+        actorId: userId,
+      });
+    }
 
     return {
       workspaceId: invitation.workspace_id,
@@ -285,98 +285,98 @@ async addMember(workspaceId, userId, email, role = 'MEMBER') {
     };
   }
 
-//   async removeMember(workspaceId, userId, memberId) {
-//     // Check if user is owner or admin
-//     const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
-//     if (!['OWNER', 'ADMIN'].includes(userRole)) {
-//       throw new Error('Only workspace owner or admin can remove members');
-//     }
+  //   async removeMember(workspaceId, userId, memberId) {
+  //     // Check if user is owner or admin
+  //     const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
+  //     if (!['OWNER', 'ADMIN'].includes(userRole)) {
+  //       throw new Error('Only workspace owner or admin can remove members');
+  //     }
 
-//     // Check if removing self
-//     if (userId === memberId) {
-//       throw new Error('You cannot remove yourself from the workspace');
-//     }
+  //     // Check if removing self
+  //     if (userId === memberId) {
+  //       throw new Error('You cannot remove yourself from the workspace');
+  //     }
 
-//     // Check if member exists
-//     const isMember = await WorkspaceQueries.isMember(workspaceId, memberId);
-//     if (!isMember) {
-//       throw new Error('User is not a member of this workspace');
-//     }
+  //     // Check if member exists
+  //     const isMember = await WorkspaceQueries.isMember(workspaceId, memberId);
+  //     if (!isMember) {
+  //       throw new Error('User is not a member of this workspace');
+  //     }
 
-//     // Check if member is owner
-//     const isOwner = await WorkspaceQueries.isOwner(workspaceId, memberId);
-//     if (isOwner) {
-//       throw new Error('Cannot remove workspace owner');
-//     }
+  //     // Check if member is owner
+  //     const isOwner = await WorkspaceQueries.isOwner(workspaceId, memberId);
+  //     if (isOwner) {
+  //       throw new Error('Cannot remove workspace owner');
+  //     }
 
-//     await WorkspaceQueries.removeMember(workspaceId, memberId);
-//     return true;
-//   }
+  //     await WorkspaceQueries.removeMember(workspaceId, memberId);
+  //     return true;
+  //   }
 
-async updateMemberRole(workspaceId, userId, memberId, role) {
-  // Check if current user is OWNER
-  const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-  if (!isOwner) {
-    throw new Error('Only workspace owner can update member roles');
+  async updateMemberRole(workspaceId, userId, memberId, role) {
+    // Check if current user is OWNER
+    const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
+    if (!isOwner) {
+      throw new Error('Only workspace owner can update member roles');
+    }
+
+    // Validate role
+    const validRoles = ['ADMIN', 'MANAGER', 'MEMBER', 'VIEWER'];
+    if (!validRoles.includes(role)) {
+      throw new Error('Invalid role');
+    }
+
+    // Find member by workspace_members.id
+    const member = await WorkspaceQueries.findMemberById(workspaceId, memberId);
+    if (!member) {
+      throw new Error('Member not found');
+    }
+
+    // Check if updating the owner
+    const isOwnerMember = await WorkspaceQueries.isOwner(workspaceId, member.user_id);
+    if (isOwnerMember) {
+      throw new Error('Cannot change owner role');
+    }
+
+    const updated = await WorkspaceQueries.updateMemberRole(workspaceId, memberId, role);
+    return updated;
   }
 
-  // Validate role
-  const validRoles = ['ADMIN', 'MANAGER', 'MEMBER', 'VIEWER'];
-  if (!validRoles.includes(role)) {
-    throw new Error('Invalid role');
+  async removeMember(workspaceId, userId, memberId) {
+    // Check if current user is owner or admin
+    const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
+    const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
+    const effectiveRole = isOwner ? 'OWNER' : userRole;
+
+    if (!['OWNER', 'ADMIN'].includes(effectiveRole)) {
+      throw new Error('Only workspace owner or admin can remove members');
+    }
+
+    // Find member by workspace_members.id
+    const member = await WorkspaceQueries.findMemberById(workspaceId, memberId);
+    if (!member) {
+      throw new Error('Member not found');
+    }
+
+    // Check if removing self
+    if (member.user_id === userId) {
+      throw new Error('You cannot remove yourself from the workspace');
+    }
+
+    // Check if removing the owner
+    const isOwnerMember = await WorkspaceQueries.isOwner(workspaceId, member.user_id);
+    if (isOwnerMember) {
+      throw new Error('Cannot remove workspace owner');
+    }
+
+    return WorkspaceQueries.removeMemberById(workspaceId, memberId);
   }
-
-  // Find member by workspace_members.id
-  const member = await WorkspaceQueries.findMemberById(workspaceId, memberId);
-  if (!member) {
-    throw new Error('Member not found');
-  }
-
-  // Check if updating the owner
-  const isOwnerMember = await WorkspaceQueries.isOwner(workspaceId, member.user_id);
-  if (isOwnerMember) {
-    throw new Error('Cannot change owner role');
-  }
-
-  const updated = await WorkspaceQueries.updateMemberRole(workspaceId, memberId, role);
-  return updated;
-}
-
-async removeMember(workspaceId, userId, memberId) {
-  // Check if current user is owner or admin
-  const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
-  const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-  const effectiveRole = isOwner ? 'OWNER' : userRole;
-
-  if (!['OWNER', 'ADMIN'].includes(effectiveRole)) {
-    throw new Error('Only workspace owner or admin can remove members');
-  }
-
-  // Find member by workspace_members.id
-  const member = await WorkspaceQueries.findMemberById(workspaceId, memberId);
-  if (!member) {
-    throw new Error('Member not found');
-  }
-
-  // Check if removing self
-  if (member.user_id === userId) {
-    throw new Error('You cannot remove yourself from the workspace');
-  }
-
-  // Check if removing the owner
-  const isOwnerMember = await WorkspaceQueries.isOwner(workspaceId, member.user_id);
-  if (isOwnerMember) {
-    throw new Error('Cannot remove workspace owner');
-  }
-
-return WorkspaceQueries.removeMemberById(workspaceId, memberId);
-}
 
   async getWorkspaceMembers(workspaceId, userId) {
     // Check if user has access
     const isMember = await WorkspaceQueries.isMember(workspaceId, userId);
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-    
+
     if (!isMember && !isOwner) {
       throw new Error('You do not have access to this workspace');
     }
@@ -392,6 +392,34 @@ return WorkspaceQueries.removeMemberById(workspaceId, memberId);
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .substring(0, 60);
+  }
+  async getAllMyTeamMembers(userId) {
+    const rows = await WorkspaceQueries.findAllMembersForUser(userId);
+
+    // Group by workspace
+    const grouped = rows.reduce((acc, row) => {
+      const key = row.workspace_id;
+      if (!acc[key]) {
+        acc[key] = {
+          workspaceId: row.workspace_id,
+          workspaceName: row.workspace_name,
+          members: [],
+        };
+      }
+      acc[key].members.push({
+        memberId: row.member_id,
+        userId: row.user_id,
+        name: row.name,
+        email: row.email,
+        profilePicture: row.profile_picture,
+        jobTitle: row.job_title,
+        role: row.role,
+        joinedAt: row.joined_at,
+      });
+      return acc;
+    }, {});
+
+    return Object.values(grouped);
   }
 }
 

@@ -6,18 +6,18 @@ import {
   UsersIcon,
   Cog6ToothIcon,
   FolderIcon,
-  CalendarIcon,
   Squares2X2Icon,
   CheckCircleIcon,
+  BellIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'My Tasks', href: '/my-tasks', icon: CheckCircleIcon },
-  { name: 'Workspaces', href: '/workspaces', icon: Squares2X2Icon },
   { name: 'Projects', href: '/projects', icon: FolderIcon },
   { name: 'Team', href: '/team', icon: UsersIcon },
-  { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
+  { name: 'Notifications', href: '/notifications', icon: BellIcon },
+  { name: 'Workspaces', href: '/workspaces', icon: Squares2X2Icon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ];
 
@@ -53,7 +53,7 @@ export const Sidebar = () => {
       <div className="p-4 border-t border-gray-200">
         <div className="text-xs text-gray-500">
           <p>TaskFlow v1.0.0</p>
-          <p className="mt-1">© 2024 TaskFlow Inc.</p>
+          <p className="mt-1">© 2026 TaskFlow Inc.</p>
         </div>
       </div>
     </div>

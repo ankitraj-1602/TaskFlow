@@ -76,72 +76,72 @@ class WorkspaceController {
     }
   }
 
-static async addMember(req, res) {
-  try {
-    const { id } = req.params;
-    const userId = req.user.userId;
-    const { email, role } = req.body;
+  static async addMember(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user.userId;
+      const { email, role } = req.body;
 
-    const result = await workspaceService.addMember(id, userId, email, role);
+      const result = await workspaceService.addMember(id, userId, email, role);
 
-    // Return the FULL result including `type`
-    if (result.type === 'added') {
-      return successResponse(res, result, 'Member added successfully', 201);
-    } else if (result.type === 'invited') {
-      return successResponse(res, result, 'Invitation sent successfully', 201);
-    } else {
-      return successResponse(res, result, 'Operation completed', 201);
+      // Return the FULL result including `type`
+      if (result.type === 'added') {
+        return successResponse(res, result, 'Member added successfully', 201);
+      } else if (result.type === 'invited') {
+        return successResponse(res, result, 'Invitation sent successfully', 201);
+      } else {
+        return successResponse(res, result, 'Operation completed', 201);
+      }
+    } catch (error) {
+      errorResponse(res, error.message, 400);
     }
-  } catch (error) {
-    errorResponse(res, error.message, 400);
   }
-}
 
-static async getPendingInvitations(req, res) {
-  try {
-    const { id } = req.params;
-    const userId = req.user.userId;
+  static async getPendingInvitations(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user.userId;
 
-    const invitations = await workspaceService.getPendingInvitations(id, userId);
-    successResponse(res, invitations, 'Invitations retrieved successfully');
-  } catch (error) {
-    errorResponse(res, error.message, 403);
+      const invitations = await workspaceService.getPendingInvitations(id, userId);
+      successResponse(res, invitations, 'Invitations retrieved successfully');
+    } catch (error) {
+      errorResponse(res, error.message, 403);
+    }
   }
-}
 
-static async cancelInvitation(req, res) {
-  try {
-    const { id, invitationId } = req.params;
-    const userId = req.user.userId;
+  static async cancelInvitation(req, res) {
+    try {
+      const { id, invitationId } = req.params;
+      const userId = req.user.userId;
 
-    await workspaceService.cancelInvitation(id, userId, invitationId);
-    successResponse(res, null, 'Invitation cancelled successfully');
-  } catch (error) {
-    errorResponse(res, error.message, 400);
+      await workspaceService.cancelInvitation(id, userId, invitationId);
+      successResponse(res, null, 'Invitation cancelled successfully');
+    } catch (error) {
+      errorResponse(res, error.message, 400);
+    }
   }
-}
 
-static async acceptInvitation(req, res) {
-  try {
-    const { token } = req.params;  // ⬅️ from params
-    const userId = req.user.userId;
+  static async acceptInvitation(req, res) {
+    try {
+      const { token } = req.params;  // ⬅️ from params
+      const userId = req.user.userId;
 
-    const result = await workspaceService.acceptInvitation(token, userId);
-    successResponse(res, result, 'Invitation accepted successfully');
-  } catch (error) {
-    errorResponse(res, error.message, 400);
+      const result = await workspaceService.acceptInvitation(token, userId);
+      successResponse(res, result, 'Invitation accepted successfully');
+    } catch (error) {
+      errorResponse(res, error.message, 400);
+    }
   }
-}
 
-static async getInvitationDetails(req, res) {
-  try {
-    const { token } = req.params;
-    const details = await workspaceService.getInvitationDetails(token);
-    successResponse(res, details, 'Invitation details retrieved');
-  } catch (error) {
-    errorResponse(res, error.message, 404);
+  static async getInvitationDetails(req, res) {
+    try {
+      const { token } = req.params;
+      const details = await workspaceService.getInvitationDetails(token);
+      successResponse(res, details, 'Invitation details retrieved');
+    } catch (error) {
+      errorResponse(res, error.message, 404);
+    }
   }
-}
 
   static async removeMember(req, res) {
     try {
@@ -180,6 +180,15 @@ static async getInvitationDetails(req, res) {
       successResponse(res, members, 'Members retrieved successfully');
     } catch (error) {
       errorResponse(res, error.message, 404);
+    }
+  }
+  static async getMyTeam(req, res) {
+    try {
+      const userId = req.user.userId;
+      const team = await workspaceService.getAllMyTeamMembers(userId);
+      successResponse(res, team, 'Team retrieved successfully');
+    } catch (error) {
+      errorResponse(res, error.message, 500);
     }
   }
 }

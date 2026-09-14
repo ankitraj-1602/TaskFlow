@@ -19,6 +19,7 @@ const { apiRateLimiter } = require('./middleware/rateLimit.middleware');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const ProjectController = require('./controllers/project.controller');
 const { authenticate } = require('./middleware/auth.middleware');
+const WorkspaceController = require('./controllers/workspace.controller');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -49,13 +50,14 @@ app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', workspaceRoutes);
 app.use('/api', taskRoutes);
 app.use('/api/projects', projectRoutes);
-app.use('/api/invitations', invitationRoutes); 
+app.use('/api/invitations', invitationRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api', commentRoutes);  
+app.use('/api', commentRoutes);
 app.use('/api', activityRoutes);
 app.use('/api', dashboardRoutes);
 
 app.get('/api/me/projects', authenticate, ProjectController.getMyProjects);
+app.get('/api/me/team', authenticate, WorkspaceController.getMyTeam);
 
 app.use((req, res) => {
   res.status(404).json({

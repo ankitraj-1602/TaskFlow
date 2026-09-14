@@ -38,10 +38,13 @@ export const workspaceApi = {
   },
 
   getPendingInvitations: (workspaceId) => {
-  return apiClient.get(`/workspaces/${workspaceId}/invitations`).then(res => res.data.data);
-},
+    return apiClient.get(`/workspaces/${workspaceId}/invitations`).then(res => res.data.data);
+  },
 
-cancelInvitation: (workspaceId, invitationId) => {
-  return apiClient.delete(`/workspaces/${workspaceId}/invitations/${invitationId}`).then(res => res.data.data);
-},
+  cancelInvitation: (workspaceId, invitationId) => {
+    return apiClient.delete(`/workspaces/${workspaceId}/invitations/${invitationId}`).then(res => res.data.data);
+  },
+  getMyTeam: () => {
+    return apiClient.get('/me/team').then((res) => res.data.data);
+  },
 };

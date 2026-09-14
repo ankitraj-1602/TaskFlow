@@ -24,17 +24,17 @@ import { Notifications } from './pages/Notifications';
 import { useSocketStore } from './store/socket.store';
 import { useSocketEvents } from './hooks/useSocketEvents';
 import { ProjectsList } from './pages/ProjectsList';
-
+import { Team } from './pages/Team';
 
 function App() {
-    const { loadUser, isAuthenticated } = useAuthStore();
+  const { loadUser, isAuthenticated } = useAuthStore();
   const { connect, disconnect } = useSocketStore();
-   useSocketEvents();
+  useSocketEvents();
 
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
     if (accessToken && !isAuthenticated) {
-      loadUser().catch(() => {});
+      loadUser().catch(() => { });
     }
   }, []);
 
@@ -80,20 +80,21 @@ function App() {
         {/* Task routes */}
         <Route path="/workspaces/:workspaceId/projects/:projectId/tasks" element={<Tasks />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-<Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
-<Route path="/invitations/:token" element={<AcceptInvitation />} />
+        <Route path="/invitations/:token" element={<AcceptInvitation />} />
 
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
         <Route path="/settings" element={<Settings />} />
         <Route
-  path="/workspaces/:workspaceId/projects/:projectId/board"
-  element={<KanbanBoard />}
-  
-/>
-<Route path="/notifications" element={<Notifications />} />
-<Route path="/projects" element={<ProjectsList />} />
+          path="/workspaces/:workspaceId/projects/:projectId/board"
+          element={<KanbanBoard />}
+
+        />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/projects" element={<ProjectsList />} />
+        <Route path="/team" element={<Team />} />
       </Routes>
     </Router>
   );
