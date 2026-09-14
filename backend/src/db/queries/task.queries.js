@@ -55,21 +55,21 @@ class TaskQueries {
   static async findById(id) {
     const query = `
       SELECT t.*,
-        u.name as created_by_name, u.email as created_by_email,
-        a.name as assignee_name, a.email as assignee_email, 
-        a.profile_picture as assignee_picture,
-        r.name as reporter_name,
-        p.name as project_name, p.workspace_id,
-        (SELECT COUNT(*) FROM comments WHERE task_id = t.id) as comment_count,
-        (SELECT COUNT(*) FROM attachments WHERE task_id = t.id) as attachment_count,
-        wm.user_id as assignee_user_id
-      FROM tasks t
-      LEFT JOIN users u ON t.created_by_id = u.id
-      LEFT JOIN workspace_members wm ON t.assignee_id = wm.id
-      LEFT JOIN users a ON wm.user_id = a.id
-      LEFT JOIN users r ON t.reporter_id = r.id
-      LEFT JOIN projects p ON t.project_id = p.id
-      WHERE t.id = $1
+  u.name as created_by_name, u.email as created_by_email,
+  a.name as assignee_name, a.email as assignee_email, 
+  a.profile_picture as assignee_picture,
+  r.name as reporter_name,
+  p.name as project_name, p.workspace_id,
+  (SELECT COUNT(*) FROM comments WHERE task_id = t.id) as comment_count,
+  (SELECT COUNT(*) FROM attachments WHERE task_id = t.id) as attachment_count,
+  wm.user_id as assignee_user_id
+FROM tasks t
+LEFT JOIN users u ON t.created_by_id = u.id
+LEFT JOIN workspace_members wm ON t.assignee_id = wm.id
+LEFT JOIN users a ON wm.user_id = a.id
+LEFT JOIN users r ON t.reporter_id = r.id
+LEFT JOIN projects p ON t.project_id = p.id
+WHERE t.id = $1
     `;
     const result = await QueryHelper.query(query, [id]);
     return result.rows[0] || null;

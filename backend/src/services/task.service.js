@@ -14,16 +14,16 @@ class TaskService {
     throw new Error('Project not found');
   }
 
-  const hasAccess = await this.checkProjectAccess(project, userId);
+  const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
   if (!hasAccess) {
     throw new Error('You do not have access to this project');
   }
 
-  // Convert user_id to workspace_member_id if assignee provided
+  // Convert user_id → workspace_member_id
   let workspaceMemberId = null;
   if (data.assigneeId) {
     const members = await WorkspaceQueries.getMembers(project.workspace_id);
-    const workspaceMember = members.find(m => m.user_id === data.assigneeId);
+    const workspaceMember = members.find((m) => m.user_id === data.assigneeId);
     if (!workspaceMember) {
       throw new Error('Assignee is not a member of this workspace');
     }
@@ -44,6 +44,7 @@ class TaskService {
     metadata: data.metadata,
   });
 
+  // Log activity
   await activityService.log({
     action: 'CREATED',
     userId,
@@ -53,24 +54,21 @@ class TaskService {
     changes: { title: task.title },
   });
 
-  // After creating the task and logging activity
-if (workspaceMemberId && data.assigneeId) {
-  await notificationService.notifyTaskAssigned({
-    userId: data.assigneeId,             // user_id
-    actorId: userId,
-    taskId: task.id,
-    taskTitle: task.title,
-    projectId,
-  });
-}
-emitToWorkspace(project.workspace_id, 'task:created', {
-  task: this.enrichTask(task),
-  projectId,
-  workspaceId: project.workspace_id,
-  actorId: userId,
-});
+  // Notify assignee
+  if (workspaceMemberId && data.assigneeId) {
+    await notificationService.notifyTaskAssigned({
+      userId: data.assigneeId,
+      actorId: userId,
+      taskId: task.id,
+      taskTitle: task.title,
+      projectId,
+      workspaceId: project.workspace_id,
+    });
+  }
 
-  return this.enrichTask(task);
+  // ⬇️ THE FIX: Re-fetch with joins before returning
+  const fresh = await TaskQueries.findById(task.id);
+  return this.enrichTask(fresh);
 }
   async getTask(taskId, userId) {
     const task = await TaskQueries.findById(taskId);
@@ -543,9 +541,11 @@ enrichTask(task) {
     workspaceId: task.workspace_id,
     createdById: task.created_by_id,
     createdByName: task.created_by_name,
-    assigneeId: task.assignee_id,              // workspace_member_id
-    assigneeUserId: task.assignee_user_id,     // user_id (need to add to query)
+    createdByEmail: task.created_by_email,
+    assigneeId: task.assignee_id,
+    assigneeUserId: task.assignee_user_id,
     assigneeName: task.assignee_name,
+    assigneeEmail: task.assignee_email,
     assigneePicture: task.assignee_picture,
     reporterId: task.reporter_id,
     reporterName: task.reporter_name,
