@@ -24,7 +24,7 @@ const navigation = [
 export const Sidebar = () => {
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-      <div className="flex items-center justify-center h-16 border-b border-gray-200">
+      <div className="flex items-center justify-center h-15 border-b border-gray-200">
         <h1 className="text-2xl font-bold text-indigo-600">TaskFlow</h1>
       </div>
 

@@ -36,10 +36,7 @@ useEffect(() => {
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
-      <div className="flex items-center justify-between px-6 py-3">
-        <div className="flex items-center">
-          <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
-        </div>
+      <div className="flex items-center justify-end px-6 py-3">
 
         <div className="flex items-center space-x-4">
           {/* Notification bell */}
