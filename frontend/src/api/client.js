@@ -1,15 +1,27 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+// Normalize base URL — ensure it ends with /api exactly once
+const getApiBase = () => {
+  const base = API_URL.replace(/\/+$/, ''); // strip trailing slashes
+  return base.endsWith('/api') ? base : `${base}/api`;
+};
+
+const API_BASE = getApiBase();
+
+console.log('🔗 API base:', API_BASE);
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: API_BASE,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor - Add token
+// ─── Request interceptor: attach access token ─────
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
@@ -21,52 +33,131 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor - Handle token refresh
+// ─── Refresh queue: prevent concurrent refreshes ─
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) prom.reject(error);
+    else prom.resolve(token);
+  });
+  failedQueue = [];
+};
+
+const clearAuthAndRedirect = () => {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+  if (
+    window.location.pathname !== '/login' &&
+    window.location.pathname !== '/register'
+  ) {
+    window.location.href = '/login';
+  }
+};
+
+// ─── Response interceptor: refresh on 401 ────────
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // If error is 401 and not already retrying
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Don't retry auth endpoints (prevents infinite loops)
+    const isAuthEndpoint =
+      originalRequest?.url?.includes('/auth/refresh-token') ||
+      originalRequest?.url?.includes('/auth/login') ||
+      originalRequest?.url?.includes('/auth/register');
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint
+    ) {
+      // If already refreshing → queue this request
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = localStorage.getItem('refreshToken');
+
+      if (!refreshToken) {
+        isRefreshing = false;
+        clearAuthAndRedirect();
+        return Promise.reject(error);
+      }
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          throw new Error('No refresh token');
-        }
+        console.log('🔄 Access token expired — refreshing...');
 
-        // Call refresh endpoint
+        // ⬇️ FIX: use API_BASE + /auth/refresh-token
+        // API_BASE already includes /api, so no double prefix
         const response = await axios.post(
-          `${import.meta.env.VITE_API_URL}/auth/refresh-token`,
+          `${API_BASE}/auth/refresh-token`,
           { refreshToken }
         );
 
-        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+        // Handle multiple possible response shapes
+        const payload = response.data?.data || response.data;
+        const tokens = payload?.tokens || payload;
 
-        // Store new tokens
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', newRefreshToken);
+        const newAccessToken = tokens.accessToken || tokens.access_token;
+        const newRefreshToken = tokens.refreshToken || tokens.refresh_token;
 
-        // Retry original request with new token
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        if (!newAccessToken) {
+          throw new Error('Refresh response missing accessToken');
+        }
+
+        console.log('✅ Token refreshed');
+
+        localStorage.setItem('accessToken', newAccessToken);
+        if (newRefreshToken) {
+          localStorage.setItem('refreshToken', newRefreshToken);
+        }
+
+        // Retry all queued requests with new token
+        processQueue(null, newAccessToken);
+        isRefreshing = false;
+
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - logout user
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+        console.error('❌ Refresh failed:', refreshError);
+        processQueue(refreshError, null);
+        isRefreshing = false;
+        clearAuthAndRedirect();
         return Promise.reject(refreshError);
       }
     }
 
-    // Show error message
-    if (error.response?.data?.message) {
-      toast.error(error.response.data.message);
-    } else if (error.message) {
-      toast.error(error.message);
+    // Show error message (skip noise)
+    const silentPaths = [
+      '/auth/refresh-token',
+      '/auth/verify-email',
+      '/auth/forgot-password',
+      '/auth/reset-password',
+      '/auth/login',
+      '/auth/register',
+      '/notifications/unread-count',
+    ];
+    const isSilent = silentPaths.some((p) => originalRequest?.url?.includes(p));
+
+    if (!isSilent && error.response?.status !== 401) {
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.message && error.code !== 'ERR_CANCELED') {
+        toast.error(error.message);
+      }
     }
 
     return Promise.reject(error);
