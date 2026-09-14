@@ -19,32 +19,32 @@ export const OverviewCards = ({ stats }) => {
         label="Projects"
         value={overview.totalProjects}
         icon={FolderIcon}
-        color="bg-blue-500"
+        tone="blue"
       />
       <StatCard
         label="Total Tasks"
         value={overview.totalTasks}
         icon={ClipboardDocumentListIcon}
-        color="bg-indigo-500"
+        tone="indigo"
       />
       <StatCard
         label="Completed"
         value={overview.completedTasks}
         icon={CheckCircleIcon}
-        color="bg-green-500"
+        tone="green"
         subtitle={`${overview.completionRate}% complete`}
       />
       <StatCard
         label="Overdue"
         value={overview.overdueTasks}
         icon={ExclamationTriangleIcon}
-        color="bg-red-500"
+        tone="red"
       />
       <StatCard
         label="Members"
         value={overview.totalMembers}
         icon={UsersIcon}
-        color="bg-purple-500"
+        tone="purple"
       />
     </div>
   );
