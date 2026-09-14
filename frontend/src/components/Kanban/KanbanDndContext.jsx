@@ -23,12 +23,13 @@ export const KanbanDndProvider = ({
   tasks,
   onTaskMove,
   onTaskClick,
+  canDrag = true,   // ⬅️ ADD THIS — was missing
 }) => {
   const [activeTask, setActiveTask] = React.useState(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 }, // avoid accidental drags on click
+      activationConstraint: { distance: 5 },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
@@ -40,17 +41,15 @@ export const KanbanDndProvider = ({
   };
 
   const handleDragStart = (event) => {
+    if (!canDrag) return;
     const { active } = event;
     const task = tasks.find((t) => t.id === active.id);
     setActiveTask(task || null);
   };
 
-  const handleDragOver = (event) => {
-    // Optional: live feedback while dragging over another column.
-    // We'll keep it minimal for now — actual move happens on drop.
-  };
-
   const handleDragEnd = (event) => {
+    if (!canDrag) return;   // now `canDrag` is defined ✅
+
     const { active, over } = event;
     setActiveTask(null);
 
@@ -61,7 +60,6 @@ export const KanbanDndProvider = ({
 
     const activeColumn = findColumnOfTask(activeId);
 
-    // Determine target column
     let overColumn;
     if (overId.toString().startsWith('column-')) {
       overColumn = overId.toString().replace('column-', '');
@@ -71,7 +69,7 @@ export const KanbanDndProvider = ({
 
     if (!activeColumn || !overColumn) return;
 
-    // ─── Case 1: Same column — reorder ────────────────
+    // ─── Same column: reorder ─────────────────────────
     if (activeColumn === overColumn) {
       const columnTasks = tasks.filter((t) => t.status === activeColumn);
       const oldIndex = columnTasks.findIndex((t) => t.id === activeId);
@@ -84,8 +82,7 @@ export const KanbanDndProvider = ({
       return;
     }
 
-    // ─── Case 2: Different column — move to end ────────
-    // If dropped on a card, insert before that card
+    // ─── Different column: move to position ───────────
     let newPosition = 1;
     if (!overId.toString().startsWith('column-')) {
       const targetColumnTasks = tasks.filter((t) => t.status === overColumn);
@@ -102,20 +99,21 @@ export const KanbanDndProvider = ({
   return (
     <KanbanDndContext_.Provider value={{ activeTask }}>
       <DndContext
-        sensors={sensors}
+        sensors={canDrag ? sensors : []}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         {children}
-        <DragOverlay>
-          {activeTask ? (
-            <div className="rotate-3 shadow-xl">
-              <TaskCard task={activeTask} isDragging />
-            </div>
-          ) : null}
-        </DragOverlay>
+        {canDrag && (
+          <DragOverlay>
+            {activeTask ? (
+              <div className="rotate-3 shadow-xl">
+                <TaskCard task={activeTask} isDragging />
+              </div>
+            ) : null}
+          </DragOverlay>
+        )}
       </DndContext>
     </KanbanDndContext_.Provider>
   );

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { taskApi } from '../api/task.api';
 
 export const useTaskStore = create((set, get) => ({
+  // ─── State ────────────────────────────────────────
   tasks: [],
   currentTask: null,
   myTasks: [],
@@ -9,11 +10,12 @@ export const useTaskStore = create((set, get) => ({
   pagination: null,
   isLoading: false,
 
+  // ─── Loaders ──────────────────────────────────────
   loadProjectTasks: async (projectId, filters = {}) => {
     set({ isLoading: true });
     try {
       const response = await taskApi.getByProject(projectId, filters);
-      
+
       if (response.pagination) {
         set({
           tasks: response.data,
@@ -46,14 +48,22 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
+  // ─── Mutations ────────────────────────────────────
   createTask: async (projectId, data) => {
     set({ isLoading: true });
     try {
       const task = await taskApi.create(projectId, data);
-      set((state) => ({
-        tasks: [task, ...state.tasks],
-        isLoading: false,
-      }));
+
+      set((state) => {
+        // Idempotent — don't add if already exists
+        if (state.tasks.find((t) => t.id === task.id)) {
+          return { isLoading: false };
+        }
+        return {
+          tasks: [task, ...state.tasks],
+          isLoading: false,
+        };
+      });
       return task;
     } catch (error) {
       set({ isLoading: false });
@@ -66,8 +76,13 @@ export const useTaskStore = create((set, get) => ({
     try {
       const task = await taskApi.update(taskId, data);
       set((state) => ({
-        tasks: state.tasks.map(t => t.id === taskId ? task : t),
-        currentTask: state.currentTask?.id === taskId ? task : state.currentTask,
+        tasks: state.tasks.map((t) =>
+          t.id === taskId ? { ...t, ...task } : t
+        ),
+        currentTask:
+          state.currentTask?.id === taskId
+            ? { ...state.currentTask, ...task }
+            : state.currentTask,
         isLoading: false,
       }));
       return task;
@@ -77,52 +92,54 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-updateTaskStatus: async (taskId, status, position) => {
-  const previousTasks = get().tasks;
-  const existingTask = previousTasks.find((t) => t.id === taskId);
+  updateTaskStatus: async (taskId, status, position) => {
+    const previousTasks = get().tasks;
+    const existingTask = previousTasks.find((t) => t.id === taskId);
 
-  if (!existingTask) {
-    throw new Error('Task not found in store');
-  }
+    if (!existingTask) {
+      throw new Error('Task not found in store');
+    }
 
-  // ─── Optimistic update ─────────────────────────────
-  set((state) => ({
-    tasks: state.tasks.map((t) =>
-      t.id === taskId ? { ...t, status, position: position ?? t.position } : t
-    ),
-  }));
-
-  try {
-    const updated = await taskApi.updateStatus(taskId, { status, position });
-
-    // ─── Merge: keep existing fields, overlay only what
-    //     the backend explicitly returned ───────────────
+    // Optimistic update
     set((state) => ({
-      tasks: state.tasks.map((t) => {
-        if (t.id !== taskId) return t;
-        return {
-          ...t, // preserve existing full task
-          // overlay only safe fields from backend
-          status: updated.status ?? t.status,
-          position: updated.position ?? t.position,
-          updatedAt: updated.updatedAt || updated.updated_at || t.updatedAt,
-          completedAt: updated.completedAt ?? updated.completed_at ?? t.completedAt,
-        };
-      }),
+      tasks: state.tasks.map((t) =>
+        t.id === taskId ? { ...t, status, position: position ?? t.position } : t
+      ),
     }));
 
-    return updated;
-  } catch (error) {
-    set({ tasks: previousTasks });
-    throw error;
-  }
-},
+    try {
+      const updated = await taskApi.updateStatus(taskId, { status, position });
+
+      // Defensive merge
+      set((state) => ({
+        tasks: state.tasks.map((t) => {
+          if (t.id !== taskId) return t;
+          return {
+            ...t,
+            status: updated.status ?? t.status,
+            position: updated.position ?? t.position,
+            updatedAt: updated.updatedAt || updated.updated_at || t.updatedAt,
+            completedAt:
+              updated.completedAt ?? updated.completed_at ?? t.completedAt,
+          };
+        }),
+      }));
+
+      return updated;
+    } catch (error) {
+      // Revert on error
+      set({ tasks: previousTasks });
+      throw error;
+    }
+  },
 
   reorderTasks: async (projectId, status, taskIds) => {
     try {
       await taskApi.reorder(projectId, { status, taskIds });
       return true;
     } catch (error) {
+      const { loadProjectTasks } = get();
+      await loadProjectTasks(projectId, { limit: 500 });
       throw error;
     }
   },
@@ -132,7 +149,7 @@ updateTaskStatus: async (taskId, status, position) => {
     try {
       await taskApi.delete(taskId);
       set((state) => ({
-        tasks: state.tasks.filter(t => t.id !== taskId),
+        tasks: state.tasks.filter((t) => t.id !== taskId),
         currentTask: state.currentTask?.id === taskId ? null : state.currentTask,
         isLoading: false,
       }));
@@ -148,7 +165,9 @@ updateTaskStatus: async (taskId, status, position) => {
     try {
       const task = await taskApi.archive(taskId);
       set((state) => ({
-        tasks: state.tasks.map(t => t.id === taskId ? { ...t, is_archived: true } : t),
+        tasks: state.tasks.map((t) =>
+          t.id === taskId ? { ...t, is_archived: true } : t
+        ),
         isLoading: false,
       }));
       return task;
@@ -163,7 +182,9 @@ updateTaskStatus: async (taskId, status, position) => {
     try {
       const task = await taskApi.unarchive(taskId);
       set((state) => ({
-        tasks: state.tasks.map(t => t.id === taskId ? { ...t, is_archived: false } : t),
+        tasks: state.tasks.map((t) =>
+          t.id === taskId ? { ...t, is_archived: false } : t
+        ),
         isLoading: false,
       }));
       return task;
@@ -177,10 +198,16 @@ updateTaskStatus: async (taskId, status, position) => {
     set({ isLoading: true });
     try {
       const task = await taskApi.duplicate(taskId);
-      set((state) => ({
-        tasks: [task, ...state.tasks],
-        isLoading: false,
-      }));
+      set((state) => {
+        // Idempotent
+        if (state.tasks.find((t) => t.id === task.id)) {
+          return { isLoading: false };
+        }
+        return {
+          tasks: [task, ...state.tasks],
+          isLoading: false,
+        };
+      });
       return task;
     } catch (error) {
       set({ isLoading: false });
@@ -188,6 +215,7 @@ updateTaskStatus: async (taskId, status, position) => {
     }
   },
 
+  // ─── Stats & My Tasks ─────────────────────────────
   loadTaskStats: async (projectId) => {
     try {
       const stats = await taskApi.getStats(projectId);
@@ -210,40 +238,72 @@ updateTaskStatus: async (taskId, status, position) => {
     }
   },
 
+  // ─── Socket-driven updates (idempotent) ───────────
+  addTaskFromSocket: (task) => {
+    set((state) => {
+      // Idempotent — skip if already exists
+      if (state.tasks.find((t) => t.id === task.id)) {
+        return state;
+      }
+      return { tasks: [task, ...state.tasks] };
+    });
+  },
+
+  updateTaskFromSocket: (task) => {
+    set((state) => {
+      const exists = state.tasks.find((t) => t.id === task.id);
+
+      // If it doesn't exist locally, don't add via update
+      if (!exists) return state;
+
+      return {
+        tasks: state.tasks.map((t) =>
+          t.id === task.id ? { ...t, ...task } : t
+        ),
+        currentTask:
+          state.currentTask?.id === task.id
+            ? { ...state.currentTask, ...task }
+            : state.currentTask,
+      };
+    });
+  },
+
+  moveTaskFromSocket: (taskId, status, position) => {
+    set((state) => {
+      const exists = state.tasks.find((t) => t.id === taskId);
+      if (!exists) return state;
+
+      return {
+        tasks: state.tasks.map((t) =>
+          t.id === taskId ? { ...t, status, position } : t
+        ),
+      };
+    });
+  },
+
+  removeTaskFromSocket: (taskId) => {
+    set((state) => ({
+      tasks: state.tasks.filter((t) => t.id !== taskId),
+      currentTask: state.currentTask?.id === taskId ? null : state.currentTask,
+    }));
+  },
+
+  // ─── Cleanup ──────────────────────────────────────
   clearTasks: () => {
     set({ tasks: [], currentTask: null, stats: null, pagination: null });
   },
-  // ─── Socket-driven updates ──────────────────────────
-addTaskFromSocket: (task) => {
-  set((state) => {
-    if (state.tasks.find((t) => t.id === task.id)) return state;
-    return { tasks: [task, ...state.tasks] };
-  });
-},
 
-updateTaskFromSocket: (task) => {
-  set((state) => ({
-    tasks: state.tasks.map((t) =>
-      t.id === task.id
-        ? { ...t, ...task } // merge to preserve any fields not sent
-        : t
-    ),
-    currentTask: state.currentTask?.id === task.id ? { ...state.currentTask, ...task } : state.currentTask,
-  }));
-},
+reorderTasks: async (projectId, status, taskIds) => {
+  // Optimistic update first
+  get().applyLocalReorder(status, taskIds);
 
-moveTaskFromSocket: (taskId, status, position) => {
-  set((state) => ({
-    tasks: state.tasks.map((t) =>
-      t.id === taskId ? { ...t, status, position } : t
-    ),
-  }));
-},
-
-removeTaskFromSocket: (taskId) => {
-  set((state) => ({
-    tasks: state.tasks.filter((t) => t.id !== taskId),
-    currentTask: state.currentTask?.id === taskId ? null : state.currentTask,
-  }));
+  try {
+    await taskApi.reorder(projectId, { status, taskIds });
+    return true;
+  } catch (error) {
+    // On failure, refetch to restore true order
+    await get().loadProjectTasks(projectId, { limit: 500 });
+    throw error;
+  }
 },
 }));

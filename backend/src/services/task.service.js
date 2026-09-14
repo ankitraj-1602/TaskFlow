@@ -276,6 +276,7 @@ async updateTask(taskId, userId, data) {
   }
 }
 
+const fresh = await TaskQueries.findById(taskId);
 emitToWorkspace(project.workspace_id, 'task:updated', {
   task: this.enrichTask(fresh),
   projectId: project.id,
@@ -284,7 +285,6 @@ emitToWorkspace(project.workspace_id, 'task:updated', {
 });
 
   // Re-fetch with all joins
-  const fresh = await TaskQueries.findById(taskId);
   return this.enrichTask(fresh);
 }
 async updateTaskStatus(taskId, userId, status, position) {
@@ -336,6 +336,7 @@ async updateTaskStatus(taskId, userId, status, position) {
     }
   }
 
+  const fresh = await TaskQueries.findById(taskId);
   emitToWorkspace(project.workspace_id, 'task:moved', {
   taskId,
   status,
@@ -345,7 +346,6 @@ async updateTaskStatus(taskId, userId, status, position) {
   actorId: userId,
 });
 
-  const fresh = await TaskQueries.findById(taskId);
   return this.enrichTask(fresh);
 }
     // return this.enrichTask(updated);

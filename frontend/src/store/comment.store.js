@@ -6,6 +6,7 @@ export const useCommentStore = create((set, get) => ({
   isLoading: false,
   taskId: null,
 
+  // ─── Load ─────────────────────────────────────────
   loadComments: async (taskId, force = false) => {
     const state = get();
 
@@ -24,11 +25,18 @@ export const useCommentStore = create((set, get) => ({
     }
   },
 
+  // ─── Mutations ────────────────────────────────────
   addComment: async (taskId, data) => {
     const comment = await commentApi.create(taskId, data);
 
     set((state) => {
-      // Reply → insert into parent's replies
+      // Idempotent — skip if already exists
+      const existsTop = state.comments.find((c) => c.id === comment.id);
+      const existsAsReply = state.comments.some((c) =>
+        (c.replies || []).find((r) => r.id === comment.id)
+      );
+      if (existsTop || existsAsReply) return state;
+
       if (comment.parentId) {
         return {
           comments: state.comments.map((c) =>
@@ -38,10 +46,7 @@ export const useCommentStore = create((set, get) => ({
           ),
         };
       }
-      // Top-level → append
-      return {
-        comments: [...state.comments, comment],
-      };
+      return { comments: [...state.comments, comment] };
     });
 
     return comment;
@@ -94,57 +99,73 @@ export const useCommentStore = create((set, get) => ({
     return true;
   },
 
+  // ─── Socket-driven updates (idempotent) ───────────
+  addCommentFromSocket: (comment, taskId) => {
+    // Only relevant if we're currently viewing this task's comments
+    if (get().taskId !== taskId) return;
+
+    set((state) => {
+      // Idempotent — skip if already exists at any level
+      const existsTop = state.comments.find((c) => c.id === comment.id);
+      const existsAsReply = state.comments.some((c) =>
+        (c.replies || []).find((r) => r.id === comment.id)
+      );
+      if (existsTop || existsAsReply) return state;
+
+      if (comment.parentId) {
+        return {
+          comments: state.comments.map((c) =>
+            c.id === comment.parentId
+              ? { ...c, replies: [...(c.replies || []), comment] }
+              : c
+          ),
+        };
+      }
+      return { comments: [...state.comments, comment] };
+    });
+  },
+
+  updateCommentFromSocket: (comment) => {
+    set((state) => ({
+      comments: state.comments.map((c) => {
+        if (c.id === comment.id) {
+          return {
+            ...c,
+            content: comment.content,
+            isEdited: comment.isEdited,
+            editedAt: comment.editedAt,
+          };
+        }
+        return {
+          ...c,
+          replies: (c.replies || []).map((r) =>
+            r.id === comment.id
+              ? {
+                  ...r,
+                  content: comment.content,
+                  isEdited: comment.isEdited,
+                  editedAt: comment.editedAt,
+                }
+              : r
+          ),
+        };
+      }),
+    }));
+  },
+
+  removeCommentFromSocket: (commentId) => {
+    set((state) => ({
+      comments: state.comments
+        .filter((c) => c.id !== commentId)
+        .map((c) => ({
+          ...c,
+          replies: (c.replies || []).filter((r) => r.id !== commentId),
+        })),
+    }));
+  },
+
+  // ─── Cleanup ──────────────────────────────────────
   clearComments: () => {
     set({ comments: [], taskId: null });
   },
-  addCommentFromSocket: (comment, taskId) => {
-  // Only add if we're currently viewing this task
-  if (get().taskId !== taskId) return;
-
-  set((state) => {
-    // Skip if comment already exists (avoid dupes when user is the actor)
-    const exists = state.comments.find((c) => c.id === comment.id);
-    if (exists) return state;
-
-    if (comment.parentId) {
-      return {
-        comments: state.comments.map((c) =>
-          c.id === comment.parentId
-            ? { ...c, replies: [...(c.replies || []), comment] }
-            : c
-        ),
-      };
-    }
-    return { comments: [...state.comments, comment] };
-  });
-},
-
-updateCommentFromSocket: (comment) => {
-  set((state) => ({
-    comments: state.comments.map((c) => {
-      if (c.id === comment.id) {
-        return { ...c, content: comment.content, isEdited: comment.isEdited };
-      }
-      return {
-        ...c,
-        replies: (c.replies || []).map((r) =>
-          r.id === comment.id
-            ? { ...r, content: comment.content, isEdited: comment.isEdited }
-            : r
-        ),
-      };
-    }),
-  }));
-},
-
-removeCommentFromSocket: (commentId) => {
-  set((state) => ({
-    comments: state.comments
-      .filter((c) => c.id !== commentId)
-      .map((c) => ({
-        ...c,
-        replies: (c.replies || []).filter((r) => r.id !== commentId),
-      })),
-  }));
-},
 }));

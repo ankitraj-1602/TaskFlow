@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import toast from 'react-hot-toast';
 import { useSocketStore } from '../store/socket.store';
+import { useAuthStore } from '../store/auth.store';
 import { useTaskStore } from '../store/task.store';
 import { useCommentStore } from '../store/comment.store';
 import { useActivityStore } from '../store/activity.store';
@@ -12,43 +12,57 @@ export const useSocketEvents = () => {
   useEffect(() => {
     if (!socket) return;
 
+    // Snapshot the current user ID at listener registration.
+    // Refresh on every socket change to keep it current.
+    const getCurrentUserId = () => useAuthStore.getState().user?.id;
+
     // ─── Task events ─────────────────────────────────
     const onTaskCreated = ({ task, actorId }) => {
+      // Skip if we're the actor — optimistic add already handled it
+      if (actorId === getCurrentUserId()) return;
       useTaskStore.getState().addTaskFromSocket(task);
     };
 
     const onTaskUpdated = ({ task, actorId }) => {
+      if (actorId === getCurrentUserId()) return;
       useTaskStore.getState().updateTaskFromSocket(task);
     };
 
-    const onTaskMoved = ({ taskId, status, position }) => {
+    const onTaskMoved = ({ taskId, status, position, actorId }) => {
+      if (actorId === getCurrentUserId()) return;
       useTaskStore.getState().moveTaskFromSocket(taskId, status, position);
     };
 
-    const onTaskDeleted = ({ taskId }) => {
+    const onTaskDeleted = ({ taskId, actorId }) => {
+      if (actorId === getCurrentUserId()) return;
       useTaskStore.getState().removeTaskFromSocket(taskId);
     };
 
     // ─── Comment events ──────────────────────────────
-    const onCommentCreated = ({ comment, taskId }) => {
+    const onCommentCreated = ({ comment, taskId, actorId }) => {
+      if (actorId === getCurrentUserId()) return;
       useCommentStore.getState().addCommentFromSocket(comment, taskId);
     };
 
-    const onCommentUpdated = ({ comment }) => {
+    const onCommentUpdated = ({ comment, actorId }) => {
+      if (actorId === getCurrentUserId()) return;
       useCommentStore.getState().updateCommentFromSocket(comment);
     };
 
-    const onCommentDeleted = ({ commentId }) => {
+    const onCommentDeleted = ({ commentId, actorId }) => {
+      if (actorId === getCurrentUserId()) return;
       useCommentStore.getState().removeCommentFromSocket(commentId);
     };
 
     // ─── Notification events ─────────────────────────
+    // Notifications should ALWAYS be received, even if we're the actor
+    // (the actor might be notifying themselves indirectly)
     const onNotificationNew = ({ notification }) => {
       useNotificationStore.getState().addFromSocket(notification);
     };
 
     // ─── Activity events ─────────────────────────────
-    const onActivityNew = ({ activity, projectId, taskId }) => {
+    const onActivityNew = ({ projectId, taskId }) => {
       if (taskId) useActivityStore.getState().invalidateTask(taskId);
       if (projectId) useActivityStore.getState().invalidateProject(projectId);
     };

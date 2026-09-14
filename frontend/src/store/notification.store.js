@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { notificationApi } from '../api/notification.api';
 import toast from 'react-hot-toast';
+import { notificationApi } from '../api/notification.api';
 
 export const useNotificationStore = create((set, get) => ({
   notifications: [],
@@ -29,7 +29,6 @@ export const useNotificationStore = create((set, get) => ({
       set({ unreadCount: count });
       return count;
     } catch (error) {
-      // Silent fail — unread count is non-critical
       return 0;
     }
   },
@@ -86,15 +85,30 @@ export const useNotificationStore = create((set, get) => ({
     }
   },
 
-  /**
-   * Start polling for unread count every N seconds.
-   * Cleanup-friendly: calling twice won't create duplicate intervals.
-   */
-  startPolling: (intervalMs = 30000) => {
+  // ─── Socket-driven ─────────────────────────────────
+  addFromSocket: (notification) => {
+    // Idempotent — skip duplicates
+    const exists = get().notifications.find((n) => n.id === notification.id);
+    if (exists) return;
+
+    // Show toast
+    toast.success(notification.content, {
+      icon: '🔔',
+      duration: 5000,
+    });
+
+    // Update state
+    set((state) => ({
+      notifications: [notification, ...state.notifications].slice(0, 30),
+      unreadCount: state.unreadCount + 1,
+    }));
+  },
+
+  // ─── Polling (optional fallback) ──────────────────
+  startPolling: (intervalMs = 300000) => {
     const existing = get().pollingInterval;
     if (existing) clearInterval(existing);
 
-    // Immediate first call
     get().loadUnreadCount();
 
     const id = setInterval(() => {
@@ -109,18 +123,4 @@ export const useNotificationStore = create((set, get) => ({
     if (id) clearInterval(id);
     set({ pollingInterval: null });
   },
-  addFromSocket: (notification) => {
-  set((state) => {
-    // Avoid dupe
-    if (state.notifications.find((n) => n.id === notification.id)) return state;
-
-    // Show toast
-    toast.success(notification.content, { icon: '🔔' });
-
-    return {
-      notifications: [notification, ...state.notifications].slice(0, 30),
-      unreadCount: state.unreadCount + 1,
-    };
-  });
-},
 }));

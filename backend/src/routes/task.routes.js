@@ -38,7 +38,7 @@ const updateStatusSchema = Joi.object({
 
 const reorderSchema = Joi.object({
   status: Joi.string().valid('TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED').required(),
-  taskIds: Joi.array().items(Joi.string().uuid()).required(),
+  taskIds: Joi.array().items(Joi.string().uuid()).required().min(1),
 });
 
 // All routes require authentication
@@ -47,33 +47,34 @@ router.use(authenticate);
 // ─── My tasks ───────────────────────────────────────
 router.get('/my-tasks', TaskController.getMyTasks);
 
-// ─── Tasks within project ───────────────────────────
-router.post(
-  '/projects/:projectId/tasks',
-  requireProjectAccess,                                          // ← RBAC
-  requireProjectRole('MEMBER', 'MANAGER', 'ADMIN', 'OWNER'),     // ← RBAC
-  validate(createTaskSchema),
-  TaskController.createTask
-);
-
-router.get(
-  '/projects/:projectId/tasks',
-  requireProjectAccess,                                          // ← RBAC
-  TaskController.getProjectTasks
-);
-
-router.get(
-  '/projects/:projectId/tasks/stats',
-  requireProjectAccess,                                          // ← RBAC
-  TaskController.getTaskStats
-);
-
+// ─── Reorder (must be BEFORE the /tasks generic patterns) ─
 router.post(
   '/projects/:projectId/tasks/reorder',
   requireProjectAccess,
   requireProjectRole('MEMBER', 'MANAGER', 'ADMIN', 'OWNER'),
   validate(reorderSchema),
   TaskController.reorderTasks
+);
+
+// ─── Tasks within project ───────────────────────────
+router.post(
+  '/projects/:projectId/tasks',
+  requireProjectAccess,
+  requireProjectRole('MEMBER', 'MANAGER', 'ADMIN', 'OWNER'),
+  validate(createTaskSchema),
+  TaskController.createTask
+);
+
+router.get(
+  '/projects/:projectId/tasks',
+  requireProjectAccess,
+  TaskController.getProjectTasks
+);
+
+router.get(
+  '/projects/:projectId/tasks/stats',
+  requireProjectAccess,
+  TaskController.getTaskStats
 );
 
 // ─── Individual task ────────────────────────────────

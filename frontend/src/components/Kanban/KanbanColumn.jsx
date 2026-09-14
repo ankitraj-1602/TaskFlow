@@ -6,7 +6,6 @@ import {
 import { useDroppable } from '@dnd-kit/core';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { SortableTaskCard } from './SortableTaskCard';
-import { useKanbanDnd } from './KanbanDndContext';
 
 export const KanbanColumn = ({
   column,
@@ -15,10 +14,12 @@ export const KanbanColumn = ({
   onAddTask,
   onTaskMove,
   canCreate,
+  canDrag,   // ⬅️ new prop
 }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: `column-${column.id}`,
     data: { type: 'column', columnId: column.id },
+    disabled: !canDrag,   // ⬅️ disable drop target for viewers
   });
 
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
@@ -26,7 +27,7 @@ export const KanbanColumn = ({
   return (
     <div
       className={`flex-shrink-0 w-80 bg-gray-100 rounded-lg flex flex-col max-h-[calc(100vh-220px)] transition-colors ${
-        isOver ? 'ring-2 ring-indigo-500' : ''
+        isOver && canDrag ? 'ring-2 ring-indigo-500' : ''
       }`}
     >
       {/* Column Header */}
@@ -57,7 +58,7 @@ export const KanbanColumn = ({
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
           {tasks.length === 0 ? (
             <div className="text-center py-8 text-xs text-gray-400 border-2 border-dashed border-gray-300 rounded-lg">
-              Drop tasks here
+              {canDrag ? 'Drop tasks here' : 'No tasks'}
             </div>
           ) : (
             tasks.map((task) => (
@@ -67,6 +68,7 @@ export const KanbanColumn = ({
                 onClick={() => onTaskClick(task)}
                 onTaskMove={onTaskMove}
                 columnId={column.id}
+                canDrag={canDrag}   // ⬅️ pass down
               />
             ))
           )}

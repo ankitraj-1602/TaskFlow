@@ -70,7 +70,7 @@ class CommentService {
       authorId: userId,
       parentId: data.parentId,
     });
-    
+
 
     // Save mentions
     const emails = this.extractMentionEmails(data.content);
@@ -82,71 +82,71 @@ class CommentService {
       await MentionQueries.createMany(created.id, mentionedUserIds);
     }
 
-    
-await activityService.log({
-  action: 'COMMENTED',
-  userId,
-  workspaceId: project.workspace_id,
-  projectId: project.id,
-  taskId,
-  commentId: created.id,
-});
 
-// If there are mentions, log them too
-if (mentionedUserIds.length > 0) {
-  await activityService.log({
-    action: 'MENTIONED',
-    userId,
-    workspaceId: project.workspace_id,
-    projectId: project.id,
-    taskId,
-    commentId: created.id,
-    changes: { mentionedCount: mentionedUserIds.length },
-  });
-}
+    await activityService.log({
+      action: 'COMMENTED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId: project.id,
+      taskId,
+      commentId: created.id,
+    });
+
+    // If there are mentions, log them too
+    if (mentionedUserIds.length > 0) {
+      await activityService.log({
+        action: 'MENTIONED',
+        userId,
+        workspaceId: project.workspace_id,
+        projectId: project.id,
+        taskId,
+        commentId: created.id,
+        changes: { mentionedCount: mentionedUserIds.length },
+      });
+    }
 
 
-// Notify mentioned users
-for (const mentionedUserId of mentionedUserIds) {
-  await notificationService.notifyMention({
-    userId: mentionedUserId,
-    actorId: userId,
-    taskId,
-    taskTitle: task.title,
-    commentId: created.id,
-    projectId: project.id,
-  });
-}
+    // Notify mentioned users
+    for (const mentionedUserId of mentionedUserIds) {
+      await notificationService.notifyMention({
+        userId: mentionedUserId,
+        actorId: userId,
+        taskId,
+        taskTitle: task.title,
+        commentId: created.id,
+        projectId: project.id,
+      });
+    }
 
-// Notify task assignee (if not the commenter and not already mentioned)
-const taskFull = await TaskQueries.findById(taskId);
-const members = await WorkspaceQueries.getMembers(project.workspace_id);
-const assignee = members.find((m) => m.id === taskFull.assignee_id);
+    // Notify task assignee (if not the commenter and not already mentioned)
+    const taskFull = await TaskQueries.findById(taskId);
+    const members = await WorkspaceQueries.getMembers(project.workspace_id);
+    const assignee = members.find((m) => m.id === taskFull.assignee_id);
 
-if (
-  assignee &&
-  assignee.user_id !== userId &&
-  !mentionedUserIds.includes(assignee.user_id)
-) {
-  await notificationService.notifyComment({
-    userId: assignee.user_id,
-    actorId: userId,
-    taskId,
-    taskTitle: task.title,
-    commentId: created.id,
-    projectId: project.id,
-  });
+    if (
+      assignee &&
+      assignee.user_id !== userId &&
+      !mentionedUserIds.includes(assignee.user_id)
+    ) {
+      await notificationService.notifyComment({
+        userId: assignee.user_id,
+        actorId: userId,
+        taskId,
+        taskTitle: task.title,
+        commentId: created.id,
+        projectId: project.id,
+      });
 
-  emitToWorkspace(project.workspace_id, 'comment:created', {
-  comment: this.enrichCommentTree(fullComment),
-  taskId,
-  projectId: project.id,
-  workspaceId: project.workspace_id,
-  actorId: userId,
-});
-}
-    // Re-fetch with author joins so the frontend gets full data
-    const fullComment = await CommentQueries.findById(created.id);
+      // Re-fetch with author joins so the frontend gets full data
+    }
+      const fullComment = await CommentQueries.findById(created.id);
+      emitToWorkspace(project.workspace_id, 'comment:created', {
+        comment: this.enrichCommentTree(fullComment),
+        taskId,
+        projectId: project.id,
+        workspaceId: project.workspace_id,
+        actorId: userId,
+      });
     return this.enrichCommentTree(fullComment);
   }
 
@@ -188,15 +188,15 @@ if (
       await MentionQueries.createMany(commentId, mentionedUserIds);
     }
 
-    emitToWorkspace(project.workspace_id, 'comment:updated', {
-  comment: this.enrichCommentTree(fullComment),
-  taskId: comment.task_id,
-  projectId: project.id,
-  workspaceId: project.workspace_id,
-  actorId: userId,
-});
     // Re-fetch with author joins
     const fullComment = await CommentQueries.findById(commentId);
+    emitToWorkspace(project.workspace_id, 'comment:updated', {
+      comment: this.enrichCommentTree(fullComment),
+      taskId: comment.task_id,
+      projectId: project.id,
+      workspaceId: project.workspace_id,
+      actorId: userId,
+    });
     return this.enrichCommentTree(fullComment);
   }
 
@@ -220,12 +220,12 @@ if (
 
     await CommentQueries.delete(commentId);
     emitToWorkspace(project.workspace_id, 'comment:deleted', {
-  commentId,
-  taskId: comment.task_id,
-  projectId: project.id,
-  workspaceId: project.workspace_id,
-  actorId: userId,
-});
+      commentId,
+      taskId: comment.task_id,
+      projectId: project.id,
+      workspaceId: project.workspace_id,
+      actorId: userId,
+    });
     return true;
   }
 

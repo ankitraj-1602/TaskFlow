@@ -3,7 +3,13 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TaskCard } from '../Task/TaskCard';
 
-export const SortableTaskCard = ({ task, onClick, onTaskMove, columnId }) => {
+export const SortableTaskCard = ({
+  task,
+  onClick,
+  onTaskMove,
+  columnId,
+  canDrag = true,   // ⬅️ default true (backwards compatible)
+}) => {
   const {
     attributes,
     listeners,
@@ -18,6 +24,7 @@ export const SortableTaskCard = ({ task, onClick, onTaskMove, columnId }) => {
       taskId: task.id,
       columnId,
     },
+    disabled: !canDrag,   // ⬅️ disable drag for viewers
   });
 
   const style = {
@@ -29,9 +36,10 @@ export const SortableTaskCard = ({ task, onClick, onTaskMove, columnId }) => {
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className="cursor-grab active:cursor-grabbing"
+      // ⬇️ Only attach drag listeners/handlers when drag is enabled
+      {...(canDrag ? attributes : {})}
+      {...(canDrag ? listeners : {})}
+      className={canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
     >
       <TaskCard task={task} onClick={onClick} isDragging={isDragging} />
     </div>
