@@ -20,7 +20,7 @@ export const Settings = () => {
 
   return (
     <ProtectedLayout>
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
           <p className="text-gray-600 mt-1">

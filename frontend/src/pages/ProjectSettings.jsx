@@ -108,7 +108,7 @@ export const ProjectSettings = () => {
 
   return (
     <ProtectedLayout>
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => navigate(`/workspaces/${workspaceId}/projects/${projectId}`)}
