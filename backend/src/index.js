@@ -16,6 +16,7 @@ const invitationRoutes = require("./routes/invitation.routes")
 const activityRoutes = require('./routes/activity.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const { apiRateLimiter } = require('./middleware/rateLimit.middleware');
+const dashboardRoutes = require('./routes/dashboard.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,6 +51,7 @@ app.use('/api/invitations', invitationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api', commentRoutes);  
 app.use('/api', activityRoutes);
+app.use('/api', dashboardRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
