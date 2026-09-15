@@ -6,6 +6,7 @@ const emailService = require('./email.service');
 const NotificationService = require('./notification.service');
 const notificationService = new NotificationService();
 const { cacheWrapper, invalidateCache, buildKey } = require('../utils/cache.utils');
+const EmailProducer = require('../jobs/email.producer');
 
 class WorkspaceService {
   // ─── Helper: standard member-related cache invalidation ─────
@@ -211,7 +212,14 @@ class WorkspaceService {
     });
 
     try {
-      await emailService.sendWorkspaceInvitation({
+      // await emailService.sendWorkspaceInvitation({
+      //   to: email,
+      //   inviterName: inviter.name,
+      //   workspaceName: workspace.name,
+      //   role,
+      //   token,
+      // });
+      await EmailProducer.queueWorkspaceInvitation({
         to: email,
         inviterName: inviter.name,
         workspaceName: workspace.name,

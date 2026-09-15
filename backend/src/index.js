@@ -6,6 +6,10 @@ const compression = require('compression');
 require('dotenv').config();
 const http = require('http');
 const { initSocket } = require('./config/socket');
+require('./workers/email.worker');
+require('./workers/notification.worker');
+require('./workers/cleanup.worker');
+const queueDashboard = require('./config/queueDashboard');
 
 const authRoutes = require('./routes/auth.routes');
 const commentRoutes = require('./routes/comment.routes');
@@ -23,6 +27,9 @@ const WorkspaceController = require('./controllers/workspace.controller');
 const { connectRedis } = require('./config/redis');
 const pool = require('./config/database');
 const { isRedisReady } = require('./config/redis');
+
+
+const { startScheduler } = require('./jobs/scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -51,6 +58,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/admin/queues', queueDashboard.getRouter());
 app.use('/api/workspaces', workspaceRoutes);
 app.use('/api', taskRoutes);
 app.use('/api/projects', projectRoutes);
@@ -118,6 +126,10 @@ initSocket(server);
 
 // Connect to Redis (non-blocking — app works without it)
 connectRedis();
+
+startScheduler().catch((err) =>
+  console.error('Scheduler error:', err.message)
+);
 
 server.listen(PORT, () => {
   console.log(`🚀 TaskFlow backend running on http://localhost:${PORT}`);
