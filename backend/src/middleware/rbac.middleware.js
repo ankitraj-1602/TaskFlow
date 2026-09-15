@@ -10,32 +10,18 @@ const requireWorkspaceMember = async (req, res, next) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required',
-      });
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    // Workspace id can come from params or body
     const workspaceId = req.params.workspaceId || req.params.id || req.body.workspaceId;
     if (!workspaceId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Workspace ID is required',
-      });
+      return res.status(400).json({ success: false, message: 'Workspace ID is required' });
     }
 
-    // Check if user is the owner
-    const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-    if (isOwner) {
-      req.workspaceId = workspaceId;
-      req.workspaceRole = 'OWNER';
-      return next();
-    }
+    // ⬇️ Single cache lookup
+    const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
 
-    // Check if user is a member
-    const role = await WorkspaceQueries.getUserRole(workspaceId, userId);
-    if (!role) {
+    if (!access.isOwner && !access.isMember) {
       return res.status(403).json({
         success: false,
         message: 'You are not a member of this workspace',
@@ -43,14 +29,11 @@ const requireWorkspaceMember = async (req, res, next) => {
     }
 
     req.workspaceId = workspaceId;
-    req.workspaceRole = role;
+    req.workspaceRole = access.isOwner ? 'OWNER' : access.role;
     next();
   } catch (error) {
     console.error('requireWorkspaceMember error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to verify workspace access',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to verify workspace access' });
   }
 };
 
@@ -124,7 +107,6 @@ const requireProjectAccess = async (req, res, next) => {
       });
     }
 
-    // Load project
     const project = await ProjectQueries.findById(projectId);
     if (!project) {
       return res.status(404).json({
@@ -133,27 +115,23 @@ const requireProjectAccess = async (req, res, next) => {
       });
     }
 
-    // Check workspace access first
-    const isWorkspaceOwner = await WorkspaceQueries.isOwner(project.workspace_id, userId);
-    const workspaceRole = isWorkspaceOwner 
-      ? 'OWNER' 
-      : await WorkspaceQueries.getUserRole(project.workspace_id, userId);
+    // ⬇️ Single cache lookup
+    const access = await WorkspaceQueries.getWorkspaceAccess(
+      project.workspace_id,
+      userId
+    );
 
-    if (!workspaceRole) {
+    if (!access.isOwner && !access.isMember) {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to this project',
       });
     }
 
-    // Get project-level role if any (overrides workspace role if higher)
-    // For now, we treat workspace role as authoritative
-    // (can be extended later for project-specific roles)
-
     req.project = project;
     req.projectId = projectId;
     req.workspaceId = project.workspace_id;
-    req.workspaceRole = workspaceRole;
+    req.workspaceRole = access.isOwner ? 'OWNER' : access.role;
 
     next();
   } catch (error) {

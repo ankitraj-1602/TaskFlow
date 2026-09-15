@@ -249,14 +249,12 @@ class DashboardService {
   }
 
   async checkAccess(workspaceId, userId) {
-    const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-    if (isOwner) return true;
-    const isMember = await WorkspaceQueries.isMember(workspaceId, userId);
-    if (!isMember) {
-      throw new Error('You do not have access to this workspace');
-    }
-    return true;
+  const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+  if (!access.isOwner && !access.isMember) {
+    throw new Error('You do not have access to this workspace');
   }
+  return true;
+}
 }
 
 module.exports = DashboardService;

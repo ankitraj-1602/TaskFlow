@@ -357,45 +357,85 @@ static async countByProject(projectId, filters = {}) {
     return result.rows[0];
   }
 
-  static async getMyTasks(userId, filters = {}) {
-    const conditions = ['wm.user_id = $1', 't.is_archived = FALSE'];
-    const values = [userId];
-    let paramIndex = 2;
+static async getMyTasks(userId, filters = {}) {
+  const conditions = ['wm.user_id = $1', 't.is_archived = FALSE'];
+  const values = [userId];
+  let paramIndex = 2;
 
-    if (filters.status) {
-      conditions.push(`t.status = $${paramIndex}`);
-      values.push(filters.status);
-      paramIndex++;
-    }
-
-    if (filters.projectId) {
-      conditions.push(`t.project_id = $${paramIndex}`);
-      values.push(filters.projectId);
-      paramIndex++;
-    }
-
-    const query = `
-      SELECT t.*,
-        p.name as project_name, p.workspace_id,
-        u.name as created_by_name
-      FROM tasks t
-      LEFT JOIN workspace_members wm ON t.assignee_id = wm.id
-      LEFT JOIN projects p ON t.project_id = p.id
-      LEFT JOIN users u ON t.created_by_id = u.id
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY 
-        CASE t.priority 
-          WHEN 'URGENT' THEN 1 
-          WHEN 'HIGH' THEN 2 
-          WHEN 'MEDIUM' THEN 3 
-          WHEN 'LOW' THEN 4 
-        END,
-        t.due_date ASC NULLS LAST
-      
-    `;
-    const result = await QueryHelper.query(query, values);
-    return result.rows;
+  if (filters.status) {
+    conditions.push(`t.status = $${paramIndex}`);
+    values.push(filters.status);
+    paramIndex++;
   }
+
+  if (filters.projectId) {
+    conditions.push(`t.project_id = $${paramIndex}`);
+    values.push(filters.projectId);
+    paramIndex++;
+  }
+
+  // ─── Pagination ────────────────────────────────────
+  const page = Math.max(1, parseInt(filters.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(filters.limit) || 20));
+  const offset = (page - 1) * limit;
+
+  // ─── Ordering ──────────────────────────────────────
+  const orderBy = `
+    CASE t.priority 
+      WHEN 'URGENT' THEN 1 
+      WHEN 'HIGH' THEN 2 
+      WHEN 'MEDIUM' THEN 3 
+      WHEN 'LOW' THEN 4 
+      ELSE 5
+    END ASC,
+    t.due_date ASC NULLS LAST,
+    t.created_at DESC
+  `;
+
+  // ─── Data query (paginated) ────────────────────────
+  const query = `
+    SELECT 
+      t.id, t.title, t.description, t.status, t.priority,
+      t.due_date, t.story_points, t.position, t.is_archived,
+      t.project_id, t.created_by_id, t.assignee_id, t.reporter_id,
+      t.created_at, t.updated_at, t.completed_at,
+      p.name as project_name, p.workspace_id,
+      u.name as created_by_name,
+      wm.user_id as assignee_user_id,
+      (SELECT COUNT(*) FROM comments WHERE task_id = t.id) as comment_count,
+      (SELECT COUNT(*) FROM attachments WHERE task_id = t.id) as attachment_count
+    FROM tasks t
+    LEFT JOIN workspace_members wm ON t.assignee_id = wm.id
+    LEFT JOIN projects p ON t.project_id = p.id
+    LEFT JOIN users u ON t.created_by_id = u.id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY ${orderBy}
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  // ─── Count query (for total pages) ─────────────────
+  const countQuery = `
+    SELECT COUNT(*) as total
+    FROM tasks t
+    LEFT JOIN workspace_members wm ON t.assignee_id = wm.id
+    WHERE ${conditions.join(' AND ')}
+  `;
+
+  const [dataResult, countResult] = await Promise.all([
+    QueryHelper.query(query, values),
+    QueryHelper.query(countQuery, values),
+  ]);
+
+  const total = parseInt(countResult.rows[0].total);
+
+  return {
+    data: dataResult.rows,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
+}
 }
 
 module.exports = TaskQueries;

@@ -22,18 +22,6 @@ export const Navbar = () => {
     navigate('/login');
   };
 
-  // Start polling when logged in, stop on unmount
-useEffect(() => {
-  if (user) {
-    // No longer needed — socket handles real-time
-    // startPolling(30000);
-    loadUnreadCount() // initial count on mount
-  }
-  return () => {
-    // stopPolling();
-  };
-}, [user]);
-
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="flex items-center justify-end px-6 py-3">

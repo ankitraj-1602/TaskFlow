@@ -25,10 +25,12 @@ import { useSocketStore } from './store/socket.store';
 import { useSocketEvents } from './hooks/useSocketEvents';
 import { ProjectsList } from './pages/ProjectsList';
 import { Team } from './pages/Team';
+import { useNotificationStore } from './store/notification.store';
 
 function App() {
   const { loadUser, isAuthenticated } = useAuthStore();
   const { connect, disconnect } = useSocketStore();
+  const { loadUnreadCount } = useNotificationStore();
   useSocketEvents();
 
   useEffect(() => {
@@ -41,6 +43,7 @@ function App() {
   useEffect(() => {
     if (isAuthenticated) {
       connect();
+      loadUnreadCount().catch(() => {});
     } else {
       disconnect();
     }

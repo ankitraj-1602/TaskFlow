@@ -10,7 +10,10 @@ const DEFAULT_TTL = parseInt(process.env.CACHE_TTL_SECONDS || '300');
  * - On Redis error, fall through to fetchFn (fail-open)
  */
 const cacheWrapper = async (key, ttlSeconds, fetchFn) => {
+  console.log(`🔍 cacheWrapper called for: ${key}, redisReady: ${isRedisReady()}`);
+  
   if (!isRedisReady()) {
+    console.log('⚠️ Redis not ready — bypassing cache');
     return fetchFn();
   }
 
@@ -19,8 +22,10 @@ const cacheWrapper = async (key, ttlSeconds, fetchFn) => {
   try {
     const cached = await redis.get(key);
     if (cached !== null && cached !== undefined) {
+      console.log(`✅ CACHE HIT: ${key}`);
       return JSON.parse(cached);
     }
+    console.log(`❌ CACHE MISS: ${key}`);
   } catch (err) {
     console.error('Cache read error:', err.message);
   }
@@ -30,6 +35,7 @@ const cacheWrapper = async (key, ttlSeconds, fetchFn) => {
   try {
     const ttl = ttlSeconds || DEFAULT_TTL;
     await redis.setEx(key, ttl, JSON.stringify(fresh));
+    console.log(`💾 CACHED: ${key} (${ttl}s)`);
   } catch (err) {
     console.error('Cache write error:', err.message);
   }

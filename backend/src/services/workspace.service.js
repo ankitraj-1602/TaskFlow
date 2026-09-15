@@ -8,19 +8,35 @@ const notificationService = new NotificationService();
 const { cacheWrapper, invalidateCache, buildKey } = require('../utils/cache.utils');
 
 class WorkspaceService {
+  // ─── Helper: standard member-related cache invalidation ─────
+  /**
+   * Invalidate all caches affected by a member change.
+   * @param {string} workspaceId
+   * @param {string} memberUserId - The affected user's ID
+   */
+  async invalidateMemberCaches(workspaceId, memberUserId) {
+    await invalidateCache(
+      buildKey('workspace', workspaceId, 'members'),
+      buildKey('workspace', workspaceId, 'members-list'),
+      buildKey('workspace', workspaceId, 'access', memberUserId),
+      buildKey('workspace', workspaceId, 'ismember', memberUserId),
+      buildKey('workspace', workspaceId, 'role', memberUserId),
+      buildKey('workspace', workspaceId, 'member-of-user', memberUserId),
+      buildKey('user', memberUserId, 'workspaces'),
+      buildKey('dashboard', '*', workspaceId)
+    );
+  }
+
+  // ─── Workspace CRUD ────────────────────────────────────────
   async createWorkspace(userId, data) {
     const { name, description } = data;
-
-    // Generate slug from name
     const slug = this.generateSlug(name);
 
-    // Check if slug exists
     const existingWorkspace = await WorkspaceQueries.findBySlug(slug);
     if (existingWorkspace) {
       throw new Error('A workspace with this name already exists');
     }
 
-    // Create workspace
     const workspace = await WorkspaceQueries.create({
       name,
       slug,
@@ -28,21 +44,21 @@ class WorkspaceService {
       ownerId: userId,
     });
 
-    // Add owner as member with OWNER role
     await WorkspaceQueries.addMember(workspace.id, userId, 'OWNER', userId);
 
-    await invalidateCache(buildKey('user', userId, 'workspaces'));
+    // Invalidate user's workspace list + access
+    await invalidateCache(
+      buildKey('user', userId, 'workspaces'),
+      buildKey('workspace', workspace.id, 'access', userId),
+      buildKey('workspace', workspace.id, 'isowner', userId),
+      buildKey('workspace', workspace.id, 'ismember', userId)
+    );
 
     return workspace;
   }
 
-  // async getUserWorkspaces(userId) {
-  //   return WorkspaceQueries.findByUser(userId);
-  // }
-
   async getUserWorkspaces(userId) {
     const cacheKey = buildKey('user', userId, 'workspaces');
-
     return cacheWrapper(cacheKey, 120, async () => {
       return WorkspaceQueries.findByUser(userId);
     });
@@ -54,25 +70,18 @@ class WorkspaceService {
       throw new Error('Workspace not found');
     }
 
-    // Check if user has access
-    const isMember = await WorkspaceQueries.isMember(workspaceId, userId);
-    const isOwner = workspace.owner_id === userId;
-
-    if (!isMember && !isOwner) {
+    const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+    if (!access.isOwner && !access.isMember) {
       throw new Error('You do not have access to this workspace');
     }
 
-    // Get user's role
-    const role = await WorkspaceQueries.getUserRole(workspaceId, userId);
-
     return {
       ...workspace,
-      userRole: isOwner ? 'OWNER' : role,
+      userRole: access.isOwner ? 'OWNER' : access.role,
     };
   }
 
   async updateWorkspace(workspaceId, userId, data) {
-    // Check if user is owner
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
     if (!isOwner) {
       throw new Error('Only workspace owner can update workspace');
@@ -83,9 +92,9 @@ class WorkspaceService {
       throw new Error('Workspace not found');
     }
 
+    // Workspace name/description shows in lists + dashboard headers
     await invalidateCache(
       buildKey('user', '*', 'workspaces'),
-      buildKey('workspace', workspaceId, 'members'),
       buildKey('dashboard', '*', workspaceId)
     );
 
@@ -93,7 +102,6 @@ class WorkspaceService {
   }
 
   async deleteWorkspace(workspaceId, userId) {
-    // Check if user is owner
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
     if (!isOwner) {
       throw new Error('Only workspace owner can delete workspace');
@@ -104,17 +112,25 @@ class WorkspaceService {
       throw new Error('Workspace not found');
     }
 
+    // Nuke everything related to this workspace
     await invalidateCache(
       buildKey('user', '*', 'workspaces'),
       buildKey('workspace', workspaceId, 'members'),
-      buildKey('dashboard', '*', workspaceId)
+      buildKey('workspace', workspaceId, 'members-list'),
+      buildKey('dashboard', '*', workspaceId),
+      buildKey('workspace', workspaceId, 'isowner', '*'),
+      buildKey('workspace', workspaceId, 'ismember', '*'),
+      buildKey('workspace', workspaceId, 'access', '*'),
+      buildKey('workspace', workspaceId, 'role', '*'),
+      buildKey('workspace', workspaceId, 'member-of-user', '*')
     );
 
     return true;
   }
 
+  // ─── Member management ─────────────────────────────────────
   async addMember(workspaceId, userId, email, role = 'MEMBER') {
-    // Check if user is owner or admin
+    // Permission check
     const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
     const effectiveRole = isOwner ? 'OWNER' : userRole;
@@ -129,17 +145,21 @@ class WorkspaceService {
       throw new Error('Invalid role');
     }
 
-    // Find user by email
+    // Fetch workspace ONCE at the top (used in both branches)
+    const workspace = await WorkspaceQueries.findById(workspaceId);
+    if (!workspace) {
+      throw new Error('Workspace not found');
+    }
+
     const userToAdd = await UserQueries.findByEmail(email);
 
-    // If user exists → add them directly
+    // ─── Case 1: user exists → add directly ────────────────
     if (userToAdd) {
       const isMember = await WorkspaceQueries.isMember(workspaceId, userToAdd.id);
       if (isMember) {
         throw new Error('User is already a member of this workspace');
       }
 
-      const workspace = await WorkspaceQueries.findById(workspaceId);
       const member = await WorkspaceQueries.addMember(
         workspaceId,
         userToAdd.id,
@@ -156,11 +176,10 @@ class WorkspaceService {
         });
       }
 
-      await invalidateCache(
-        buildKey('workspace', workspaceId, 'members'),
-        buildKey('user', '*', 'workspaces'),
-        buildKey('dashboard', '*', workspaceId)
-      );
+      // Invalidate all affected caches
+      await this.invalidateMemberCaches(workspaceId, userToAdd.id);
+      // Also invalidate the current user's workspace list
+      await invalidateCache(buildKey('user', userId, 'workspaces'));
 
       return {
         type: 'added',
@@ -176,7 +195,7 @@ class WorkspaceService {
       };
     }
 
-    // User doesn't exist → create invitation
+    // ─── Case 2: user doesn't exist → send invitation ──────
     const existingInvite = await InvitationQueries.findByEmail(email, workspaceId);
     if (existingInvite) {
       throw new Error('An invitation is already pending for this email');
@@ -191,7 +210,6 @@ class WorkspaceService {
       invitedBy: userId,
     });
 
-    // Send invitation email
     try {
       await emailService.sendWorkspaceInvitation({
         to: email,
@@ -204,9 +222,10 @@ class WorkspaceService {
       console.error('Failed to send invitation email:', emailError.message);
     }
 
+    // Invalidate members list + dashboard (invitation count may be shown)
     await invalidateCache(
-      buildKey('user', userId, 'workspaces'),
-      buildKey('workspace', invitation.workspace_id, 'members')
+      buildKey('workspace', workspaceId, 'members-list'),
+      buildKey('dashboard', '*', workspaceId)
     );
 
     return {
@@ -221,11 +240,8 @@ class WorkspaceService {
   }
 
   async getPendingInvitations(workspaceId, userId) {
-    const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
-    const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-    const effectiveRole = isOwner ? 'OWNER' : userRole;
-
-    if (!['OWNER', 'ADMIN'].includes(effectiveRole)) {
+    const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+    if (!access.isOwner && access.role !== 'ADMIN') {
       throw new Error('Only workspace owner or admin can view invitations');
     }
 
@@ -233,11 +249,8 @@ class WorkspaceService {
   }
 
   async cancelInvitation(workspaceId, userId, invitationId) {
-    const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
-    const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-    const effectiveRole = isOwner ? 'OWNER' : userRole;
-
-    if (!['OWNER', 'ADMIN'].includes(effectiveRole)) {
+    const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+    if (!access.isOwner && access.role !== 'ADMIN') {
       throw new Error('Only workspace owner or admin can cancel invitations');
     }
 
@@ -255,26 +268,21 @@ class WorkspaceService {
       throw new Error('Invalid or expired invitation');
     }
 
-    // Get user
     const user = await UserQueries.findById(userId);
     if (!user) {
       throw new Error('User not found');
     }
 
-    // Check if email matches
     if (user.email !== invitation.email) {
       throw new Error('This invitation was sent to a different email address');
     }
 
-    // Check if already a member
     const isMember = await WorkspaceQueries.isMember(invitation.workspace_id, userId);
     if (isMember) {
-      // Mark invitation as accepted anyway
       await InvitationQueries.accept(token, userId);
       throw new Error('You are already a member of this workspace');
     }
 
-    // Add as member
     await WorkspaceQueries.addMember(
       invitation.workspace_id,
       userId,
@@ -282,23 +290,21 @@ class WorkspaceService {
       invitation.invited_by
     );
 
-
-
-    // Mark invitation as accepted
     await InvitationQueries.accept(token, userId);
 
-    await invalidateCache(
-      buildKey('user', userId, 'workspaces'),
-      buildKey('workspace', invitation.workspace_id, 'members'),
-      buildKey('dashboard', '*', invitation.workspace_id)
-    );
+    // Invalidate all caches for this new member
+    await this.invalidateMemberCaches(invitation.workspace_id, userId);
 
+    // Notify the inviter
     const acceptingUser = await UserQueries.findById(userId);
     if (invitation.invited_by !== userId) {
       await notificationService.create({
         type: 'WORKSPACE_INVITATION',
         content: `${acceptingUser.name} accepted your invitation to "${invitation.workspace_name}"`,
-        data: { workspaceId: invitation.workspace_id, workspaceName: invitation.workspace_name },
+        data: {
+          workspaceId: invitation.workspace_id,
+          workspaceName: invitation.workspace_name,
+        },
         userId: invitation.invited_by,
         actorId: userId,
       });
@@ -325,69 +331,36 @@ class WorkspaceService {
     };
   }
 
-  //   async removeMember(workspaceId, userId, memberId) {
-  //     // Check if user is owner or admin
-  //     const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
-  //     if (!['OWNER', 'ADMIN'].includes(userRole)) {
-  //       throw new Error('Only workspace owner or admin can remove members');
-  //     }
-
-  //     // Check if removing self
-  //     if (userId === memberId) {
-  //       throw new Error('You cannot remove yourself from the workspace');
-  //     }
-
-  //     // Check if member exists
-  //     const isMember = await WorkspaceQueries.isMember(workspaceId, memberId);
-  //     if (!isMember) {
-  //       throw new Error('User is not a member of this workspace');
-  //     }
-
-  //     // Check if member is owner
-  //     const isOwner = await WorkspaceQueries.isOwner(workspaceId, memberId);
-  //     if (isOwner) {
-  //       throw new Error('Cannot remove workspace owner');
-  //     }
-
-  //     await WorkspaceQueries.removeMember(workspaceId, memberId);
-  //     return true;
-  //   }
-
   async updateMemberRole(workspaceId, userId, memberId, role) {
-    // Check if current user is OWNER
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
     if (!isOwner) {
       throw new Error('Only workspace owner can update member roles');
     }
 
-    // Validate role
     const validRoles = ['ADMIN', 'MANAGER', 'MEMBER', 'VIEWER'];
     if (!validRoles.includes(role)) {
       throw new Error('Invalid role');
     }
 
-    // Find member by workspace_members.id
     const member = await WorkspaceQueries.findMemberById(workspaceId, memberId);
     if (!member) {
       throw new Error('Member not found');
     }
 
-    // Check if updating the owner
     const isOwnerMember = await WorkspaceQueries.isOwner(workspaceId, member.user_id);
     if (isOwnerMember) {
       throw new Error('Cannot change owner role');
     }
 
     const updated = await WorkspaceQueries.updateMemberRole(workspaceId, memberId, role);
-    await invalidateCache(
-      buildKey('workspace', workspaceId, 'members'),
-      buildKey('dashboard', '*', workspaceId)
-    );
+
+    // Invalidate caches for the affected member
+    await this.invalidateMemberCaches(workspaceId, member.user_id);
+
     return updated;
   }
 
   async removeMember(workspaceId, userId, memberId) {
-    // Check if current user is owner or admin
     const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
     const effectiveRole = isOwner ? 'OWNER' : userRole;
@@ -396,60 +369,40 @@ class WorkspaceService {
       throw new Error('Only workspace owner or admin can remove members');
     }
 
-    // Find member by workspace_members.id
     const member = await WorkspaceQueries.findMemberById(workspaceId, memberId);
     if (!member) {
       throw new Error('Member not found');
     }
 
-    // Check if removing self
     if (member.user_id === userId) {
       throw new Error('You cannot remove yourself from the workspace');
     }
 
-    // Check if removing the owner
     const isOwnerMember = await WorkspaceQueries.isOwner(workspaceId, member.user_id);
     if (isOwnerMember) {
       throw new Error('Cannot remove workspace owner');
     }
+
     const result = await WorkspaceQueries.removeMemberById(workspaceId, memberId);
 
-    // ⬇️ INVALIDATE
-    await invalidateCache(
-      buildKey('workspace', workspaceId, 'members'),
-      buildKey('user', '*', 'workspaces'),   // removed user + all workspace members
-      buildKey('dashboard', '*', workspaceId)
-    );
+    // Invalidate caches for the removed member
+    await this.invalidateMemberCaches(workspaceId, member.user_id);
 
     return result;
   }
 
-  // async getWorkspaceMembers(workspaceId, userId) {
-  //   // Check if user has access
-  //   const isMember = await WorkspaceQueries.isMember(workspaceId, userId);
-  //   const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-
-  //   if (!isMember && !isOwner) {
-  //     throw new Error('You do not have access to this workspace');
-  //   }
-
-  //   return WorkspaceQueries.getMembers(workspaceId);
-  // }
   async getWorkspaceMembers(workspaceId, userId) {
-    // access check (keep existing)
-    const isMember = await WorkspaceQueries.isMember(workspaceId, userId);
-    const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-    if (!isMember && !isOwner) {
+    // Access check
+    const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+    if (!access.isOwner && !access.isMember) {
       throw new Error('You do not have access to this workspace');
     }
 
-    const cacheKey = buildKey('workspace', workspaceId, 'members');
-
-    return cacheWrapper(cacheKey, 60, async () => {
-      return WorkspaceQueries.getMembers(workspaceId);
-    });
+    // Delegate to cached query — returns ALL members
+    return WorkspaceQueries.getMembers(workspaceId);
   }
 
+  // ─── Helpers ────────────────────────────────────────────────
   generateSlug(name) {
     return name
       .toLowerCase()
@@ -459,10 +412,10 @@ class WorkspaceService {
       .replace(/^-+|-+$/g, '')
       .substring(0, 60);
   }
+
   async getAllMyTeamMembers(userId) {
     const rows = await WorkspaceQueries.findAllMembersForUser(userId);
 
-    // Group by workspace
     const grouped = rows.reduce((acc, row) => {
       const key = row.workspace_id;
       if (!acc[key]) {

@@ -54,7 +54,7 @@ const { tasks, loadProjectTasks, updateTaskStatus, reorderTasks, isLoading } = u
 
   useEffect(() => {
     loadWorkspaces().catch(() => {});
-    loadProjectTasks(projectId, { limit: 500 });
+    loadProjectTasks(projectId, { limit: 1000 });
   }, [projectId]);
 
 const getTasksForColumn = (status) => {

@@ -9,6 +9,7 @@ export const useTaskStore = create((set, get) => ({
   stats: null,
   pagination: null,
   isLoading: false,
+  myTasksPagination: null,
 
   // ─── Loaders ──────────────────────────────────────
   loadProjectTasks: async (projectId, filters = {}) => {
@@ -226,17 +227,34 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-  loadMyTasks: async (filters = {}) => {
-    set({ isLoading: true });
-    try {
-      const myTasks = await taskApi.getMyTasks(filters);
-      set({ myTasks, isLoading: false });
-      return myTasks;
-    } catch (error) {
-      set({ isLoading: false });
-      throw error;
-    }
-  },
+loadMyTasks: async (filters = {}) => {
+  set({ isLoading: true });
+  try {
+    const response = await taskApi.getMyTasks(filters);
+
+    // Response shape:
+    // { success, data: [...tasks], pagination: { page, limit, total, totalPages, hasNext, hasPrev } }
+
+    const tasks = response.data || [];
+    const pagination = response.pagination || null;
+
+    set({
+      myTasks: tasks,
+      myTasksPagination: pagination
+        ? {
+            page: pagination.page,
+            limit: pagination.limit,
+            total: pagination.total,
+            totalPages: pagination.totalPages,
+          }
+        : null,
+      isLoading: false,
+    });
+  } catch (error) {
+    set({ isLoading: false });
+    throw error;
+  }
+},
 
   // ─── Socket-driven updates (idempotent) ───────────
   addTaskFromSocket: (task) => {

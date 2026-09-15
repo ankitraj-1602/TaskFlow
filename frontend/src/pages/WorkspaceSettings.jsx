@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,27 +21,38 @@ export const WorkspaceSettings = () => {
   const { workspaces, updateWorkspace, deleteWorkspace, isLoading } = useWorkspaceStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // ⬇️ Track which workspace we've prefilled
+  const prefilledFor = useRef(null);
+
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(updateWorkspaceSchema),
   });
 
+  console.log('form values:', watch());
+
   useEffect(() => {
+    // ⬇️ Only prefill once per workspace ID
+    if (prefilledFor.current === id) return;
+
     const workspace = workspaces.find(w => w.id === id);
     if (workspace) {
       reset({
         name: workspace.name,
         description: workspace.description || '',
       });
+      prefilledFor.current = id;
     }
-  }, [id, workspaces]);
+  }, [id, workspaces, reset]);
 
   const onSubmit = async (data) => {
     try {
+      console.log(data,"data")
       await updateWorkspace(id, data);
       toast.success('Workspace updated successfully');
       navigate(`/workspaces/${id}`);
@@ -71,12 +82,16 @@ export const WorkspaceSettings = () => {
           >
             <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
           </button>
-          <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Workspace Settings</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
+            Workspace Settings
+          </h2>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
           <h3 className="text-base font-semibold text-gray-900 mb-1">General Settings</h3>
-          <p className="text-sm text-gray-500 mb-5">Update your workspace name and description.</p>
+          <p className="text-sm text-gray-500 mb-5">
+            Update your workspace name and description.
+          </p>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <Input
               label="Workspace Name"
@@ -91,6 +106,7 @@ export const WorkspaceSettings = () => {
               fullWidth
               error={errors.description?.message}
               {...register('description')}
+              name=""
             />
             <div className="flex gap-3 pt-1">
               <Button
@@ -127,14 +143,15 @@ export const WorkspaceSettings = () => {
           </div>
         </div>
 
-        {/* Delete Confirmation */}
         {showDeleteConfirm && (
           <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
               <div className="h-11 w-11 rounded-xl bg-red-50 flex items-center justify-center mb-4">
                 <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1.5">Delete Workspace</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1.5">
+                Delete Workspace
+              </h3>
               <p className="text-gray-500 mb-6 text-sm">
                 Are you sure you want to delete this workspace? All projects and tasks will be permanently deleted.
               </p>
@@ -146,11 +163,7 @@ export const WorkspaceSettings = () => {
                 >
                   Cancel
                 </Button>
-                <Button
-                  variant="danger"
-                  onClick={onDelete}
-                  loading={isLoading}
-                >
+                <Button variant="danger" onClick={onDelete} loading={isLoading}>
                   Yes, Delete
                 </Button>
               </div>

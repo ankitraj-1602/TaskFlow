@@ -31,6 +31,7 @@ app.use(helmet());
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
+  maxAge: 86400,
 }));
 app.use(compression());
 app.use(morgan('dev'));

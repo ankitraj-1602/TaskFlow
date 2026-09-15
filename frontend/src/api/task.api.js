@@ -62,14 +62,16 @@ export const taskApi = {
     return apiClient.get(`/projects/${projectId}/tasks/stats`).then(res => res.data.data);
   },
 
-  getMyTasks: (filters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.status) params.append('status', filters.status);
-    if (filters.projectId) params.append('projectId', filters.projectId);
-    
-    const query = params.toString();
-    return apiClient
-      .get(`/my-tasks${query ? `?${query}` : ''}`)
-      .then(res => res.data.data);
-  },
+getMyTasks: (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.status) params.append('status', filters.status);
+  if (filters.projectId) params.append('projectId', filters.projectId);
+  if (filters.page) params.append('page', filters.page);
+  if (filters.limit) params.append('limit', filters.limit);
+
+  const query = params.toString();
+  return apiClient
+    .get(`/my-tasks${query ? `?${query}` : ''}`)
+    .then((res) => res.data);   // ⬅️ Return FULL response, not just res.data.data
+},
 };

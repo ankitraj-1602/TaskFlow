@@ -5,18 +5,29 @@ import { StatusBadge } from '../components/UI/StatusBadge';
 import { PriorityBadge } from '../components/UI/PriorityBadge';
 import { EmptyState } from '../components/UI/EmptyState';
 import { TaskDetailModal } from '../components/Task/TaskDetailModal';
+import { Button } from '../components/Forms/Button';
 import { useTaskStore } from '../store/task.store';
 import { CalendarIcon } from '@heroicons/react/24/outline';
 
 export const MyTasks = () => {
   const navigate = useNavigate();
-  const { myTasks, loadMyTasks, isLoading } = useTaskStore();
+  const { myTasks, myTasksPagination, loadMyTasks, isLoading } = useTaskStore();
   const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
 
   useEffect(() => {
-    loadMyTasks({ status: statusFilter || undefined });
+    loadMyTasks({
+      status: statusFilter || undefined,
+      page,
+      limit: 20,
+    });
+  }, [statusFilter, page]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
   }, [statusFilter]);
 
   const handleTaskClick = (task) => {
@@ -27,11 +38,16 @@ export const MyTasks = () => {
   return (
     <ProtectedLayout>
       <div className="max-w-7xl mx-auto">
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">My Tasks</h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
+              My Tasks
+            </h2>
             <p className="text-gray-500 mt-1">
-              Tasks assigned to you across all projects
+              {myTasksPagination
+                ? `${myTasksPagination.total} task${myTasksPagination.total !== 1 ? 's' : ''} assigned to you`
+                : 'Tasks assigned to you across all projects'}
             </p>
           </div>
           <select
@@ -48,6 +64,7 @@ export const MyTasks = () => {
           </select>
         </div>
 
+        {/* Task List */}
         {isLoading && myTasks.length === 0 ? (
           <div className="flex justify-center py-16">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
@@ -56,44 +73,96 @@ export const MyTasks = () => {
           <EmptyState
             icon="🎯"
             title="No tasks assigned"
-            description="You don't have any tasks assigned to you right now"
+            description={
+              statusFilter
+                ? 'No tasks match your filter'
+                : "You don't have any tasks assigned to you right now"
+            }
           />
         ) : (
-          <div className="space-y-2.5">
-            {myTasks.map((task) => {
-              const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE';
-              return (
-                <div
-                  key={task.id}
-                  onClick={() => handleTaskClick(task)}
-                  className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md hover:border-gray-200 cursor-pointer transition-shadow"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center flex-wrap gap-2 mb-1">
-                        <h3 className="text-sm font-medium text-gray-900">
-                          {task.title}
-                        </h3>
-                        <StatusBadge status={task.status} size="sm" />
-                        <PriorityBadge priority={task.priority} size="sm" />
+          <>
+            <div className="space-y-2.5">
+              {myTasks.map((task) => {
+                const isOverdue =
+                  task.dueDate &&
+                  new Date(task.dueDate) < new Date() &&
+                  task.status !== 'DONE';
+                return (
+                  <div
+                    key={task.id}
+                    onClick={() => handleTaskClick(task)}
+                    className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md hover:border-gray-200 cursor-pointer transition-shadow"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center flex-wrap gap-2 mb-1">
+                          <h3 className="text-sm font-medium text-gray-900">
+                            {task.title}
+                          </h3>
+                          <StatusBadge status={task.status} size="sm" />
+                          <PriorityBadge priority={task.priority} size="sm" />
+                        </div>
+                        {task.projectName && (
+                          <p className="text-xs text-gray-500 font-medium">
+                            {task.projectName}
+                          </p>
+                        )}
                       </div>
-                      {task.projectName && (
-                        <p className="text-xs text-gray-500 font-medium">
-                          {task.projectName}
-                        </p>
+                      {task.dueDate && (
+                        <div
+                          className={`flex items-center text-xs shrink-0 ${
+                            isOverdue
+                              ? 'text-red-600 font-medium'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          <CalendarIcon className="h-3.5 w-3.5 mr-1" />
+                          {new Date(task.dueDate).toLocaleDateString()}
+                        </div>
                       )}
                     </div>
-                    {task.dueDate && (
-                      <div className={`flex items-center text-xs shrink-0 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-                        <CalendarIcon className="h-3.5 w-3.5 mr-1" />
-                        {new Date(task.dueDate).toLocaleDateString()}
-                      </div>
-                    )}
                   </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination Controls */}
+            {myTasksPagination && myTasksPagination.totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-100">
+                <div className="text-sm text-gray-600">
+                  Page <span className="font-medium">{myTasksPagination.page}</span> of{' '}
+                  <span className="font-medium">{myTasksPagination.totalPages}</span>
+                  {' '}— Showing{' '}
+                  <span className="font-medium">
+                    {(myTasksPagination.page - 1) * myTasksPagination.limit + 1}-
+                    {Math.min(
+                      myTasksPagination.page * myTasksPagination.limit,
+                      myTasksPagination.total
+                    )}
+                  </span>{' '}
+                  of <span className="font-medium">{myTasksPagination.total}</span>
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={page >= myTasksPagination.totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <TaskDetailModal

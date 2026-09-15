@@ -274,12 +274,11 @@ class ProjectService {
   }
 
   // Helper to get workspace role
-  async getWorkspaceRole(workspaceId, userId) {
-    const WorkspaceQueries = require('../db/queries/workspace.queries');
-    const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-    if (isOwner) return 'OWNER';
-    return WorkspaceQueries.getUserRole(workspaceId, userId);
-  }
+ async getWorkspaceRole(workspaceId, userId) {
+  const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+  if (access.isOwner) return 'OWNER';
+  return access.role;
+}
 
   // Helper methods
   async getWorkspaceMember(workspaceId, userId) {
@@ -288,13 +287,10 @@ class ProjectService {
     return members.find(m => m.user_id === userId);
   }
 
-  async checkWorkspaceAccess(workspaceId, userId) {
-    const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-    if (isOwner) return true;
-
-    const isMember = await WorkspaceQueries.isMember(workspaceId, userId);
-    return isMember;
-  }
+async checkWorkspaceAccess(workspaceId, userId) {
+  const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+  return access.isOwner || access.isMember;
+}
 
   async invalidateProjectCaches(workspaceId) {
     await invalidateCache(buildKey('dashboard', '*', workspaceId));

@@ -115,6 +115,21 @@ class NotificationQueries {
     const result = await QueryHelper.query(query, [userId]);
     return result.rowCount;
   }
+  // In notification.queries.js
+static async findById(id) {
+  const query = `
+    SELECT 
+      n.id, n.type, n.content, n.data, n.is_read, n.read_at,
+      n.user_id, n.actor_id, n.created_at,
+      u.name as actor_name, u.email as actor_email,
+      u.profile_picture as actor_picture
+    FROM notifications n
+    LEFT JOIN users u ON n.actor_id = u.id
+    WHERE n.id = $1
+  `;
+  const result = await QueryHelper.query(query, [id]);
+  return result.rows[0] || null;
+}
 }
 
 module.exports = NotificationQueries;

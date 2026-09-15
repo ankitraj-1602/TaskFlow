@@ -198,22 +198,37 @@ class TaskController {
     }
   }
 
-  static async getMyTasks(req, res) {
-    try {
-      const userId = req.user.userId;
-      const { status, projectId } = req.query;
+static async getMyTasks(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { status, projectId, page, limit } = req.query;
 
-      const filters = {};
-      if (status) filters.status = status;
-      if (projectId) filters.projectId = projectId;
+    const filters = {};
+    if (status) filters.status = status;
+    if (projectId) filters.projectId = projectId;
+    if (page) filters.page = page;
+    if (limit) filters.limit = limit;
 
-      const tasks = await taskService.getMyTasks(userId, filters);
-      console.log(tasks.length)
-      successResponse(res, tasks, 'Tasks retrieved successfully');
-    } catch (error) {
-      errorResponse(res, error.message, 500);
+    const result = await taskService.getMyTasks(userId, filters);
+
+    // Support both old (array) and new (paginated) response shapes
+    if (Array.isArray(result)) {
+      return successResponse(res, result, 'Tasks retrieved successfully');
     }
+
+    // Paginated response
+    return paginatedResponse(
+      res,
+      result.data,
+      result.total,
+      result.page,
+      result.limit,
+      'Tasks retrieved successfully'
+    );
+  } catch (error) {
+    errorResponse(res, error.message, 500);
   }
+}
 }
 
 module.exports = TaskController;
