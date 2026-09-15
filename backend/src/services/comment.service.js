@@ -9,6 +9,7 @@ const activityService = new ActivityService();
 const NotificationService = require('./notification.service');
 const notificationService = new NotificationService();
 const { emitToWorkspace } = require('../config/socket');
+const { invalidateCache, buildKey } = require('../utils/cache.utils');
 
 class CommentService {
   /**
@@ -139,14 +140,16 @@ class CommentService {
 
       // Re-fetch with author joins so the frontend gets full data
     }
-      const fullComment = await CommentQueries.findById(created.id);
-      emitToWorkspace(project.workspace_id, 'comment:created', {
-        comment: this.enrichCommentTree(fullComment),
-        taskId,
-        projectId: project.id,
-        workspaceId: project.workspace_id,
-        actorId: userId,
-      });
+    const fullComment = await CommentQueries.findById(created.id);
+    emitToWorkspace(project.workspace_id, 'comment:created', {
+      comment: this.enrichCommentTree(fullComment),
+      taskId,
+      projectId: project.id,
+      workspaceId: project.workspace_id,
+      actorId: userId,
+    });
+
+    await this.invalidateCommentCaches(project.workspace_id);
     return this.enrichCommentTree(fullComment);
   }
 
@@ -197,6 +200,8 @@ class CommentService {
       workspaceId: project.workspace_id,
       actorId: userId,
     });
+
+    await this.invalidateCommentCaches(project.workspace_id);
     return this.enrichCommentTree(fullComment);
   }
 
@@ -226,6 +231,8 @@ class CommentService {
       workspaceId: project.workspace_id,
       actorId: userId,
     });
+
+    await this.invalidateCommentCaches(project.workspace_id);
     return true;
   }
 
@@ -253,6 +260,10 @@ class CommentService {
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
     if (isOwner) return true;
     return WorkspaceQueries.isMember(workspaceId, userId);
+  }
+
+  async invalidateCommentCaches(workspaceId) {
+    await invalidateCache(buildKey('dashboard', '*', workspaceId));
   }
 
   async getWorkspaceRole(workspaceId, userId) {

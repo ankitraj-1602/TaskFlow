@@ -5,6 +5,7 @@ const { createWorkspaceInvitationToken } = require('../utils/token.utils');
 const emailService = require('./email.service');
 const NotificationService = require('./notification.service');
 const notificationService = new NotificationService();
+const { cacheWrapper, invalidateCache, buildKey } = require('../utils/cache.utils');
 
 class WorkspaceService {
   async createWorkspace(userId, data) {
@@ -30,11 +31,21 @@ class WorkspaceService {
     // Add owner as member with OWNER role
     await WorkspaceQueries.addMember(workspace.id, userId, 'OWNER', userId);
 
+    await invalidateCache(buildKey('user', userId, 'workspaces'));
+
     return workspace;
   }
 
+  // async getUserWorkspaces(userId) {
+  //   return WorkspaceQueries.findByUser(userId);
+  // }
+
   async getUserWorkspaces(userId) {
-    return WorkspaceQueries.findByUser(userId);
+    const cacheKey = buildKey('user', userId, 'workspaces');
+
+    return cacheWrapper(cacheKey, 120, async () => {
+      return WorkspaceQueries.findByUser(userId);
+    });
   }
 
   async getWorkspace(workspaceId, userId) {
@@ -72,6 +83,12 @@ class WorkspaceService {
       throw new Error('Workspace not found');
     }
 
+    await invalidateCache(
+      buildKey('user', '*', 'workspaces'),
+      buildKey('workspace', workspaceId, 'members'),
+      buildKey('dashboard', '*', workspaceId)
+    );
+
     return workspace;
   }
 
@@ -86,6 +103,12 @@ class WorkspaceService {
     if (!workspace) {
       throw new Error('Workspace not found');
     }
+
+    await invalidateCache(
+      buildKey('user', '*', 'workspaces'),
+      buildKey('workspace', workspaceId, 'members'),
+      buildKey('dashboard', '*', workspaceId)
+    );
 
     return true;
   }
@@ -116,6 +139,7 @@ class WorkspaceService {
         throw new Error('User is already a member of this workspace');
       }
 
+      const workspace = await WorkspaceQueries.findById(workspaceId);
       const member = await WorkspaceQueries.addMember(
         workspaceId,
         userToAdd.id,
@@ -131,6 +155,12 @@ class WorkspaceService {
           workspaceName: workspace.name,
         });
       }
+
+      await invalidateCache(
+        buildKey('workspace', workspaceId, 'members'),
+        buildKey('user', '*', 'workspaces'),
+        buildKey('dashboard', '*', workspaceId)
+      );
 
       return {
         type: 'added',
@@ -152,7 +182,6 @@ class WorkspaceService {
       throw new Error('An invitation is already pending for this email');
     }
 
-    const workspace = await WorkspaceQueries.findById(workspaceId);
     const inviter = await UserQueries.findById(userId);
 
     const { token, invitation } = await createWorkspaceInvitationToken({
@@ -174,6 +203,11 @@ class WorkspaceService {
     } catch (emailError) {
       console.error('Failed to send invitation email:', emailError.message);
     }
+
+    await invalidateCache(
+      buildKey('user', userId, 'workspaces'),
+      buildKey('workspace', invitation.workspace_id, 'members')
+    );
 
     return {
       type: 'invited',
@@ -252,6 +286,12 @@ class WorkspaceService {
 
     // Mark invitation as accepted
     await InvitationQueries.accept(token, userId);
+
+    await invalidateCache(
+      buildKey('user', userId, 'workspaces'),
+      buildKey('workspace', invitation.workspace_id, 'members'),
+      buildKey('dashboard', '*', invitation.workspace_id)
+    );
 
     const acceptingUser = await UserQueries.findById(userId);
     if (invitation.invited_by !== userId) {
@@ -339,6 +379,10 @@ class WorkspaceService {
     }
 
     const updated = await WorkspaceQueries.updateMemberRole(workspaceId, memberId, role);
+    await invalidateCache(
+      buildKey('workspace', workspaceId, 'members'),
+      buildKey('dashboard', '*', workspaceId)
+    );
     return updated;
   }
 
@@ -368,20 +412,42 @@ class WorkspaceService {
     if (isOwnerMember) {
       throw new Error('Cannot remove workspace owner');
     }
+    const result = await WorkspaceQueries.removeMemberById(workspaceId, memberId);
 
-    return WorkspaceQueries.removeMemberById(workspaceId, memberId);
+    // ⬇️ INVALIDATE
+    await invalidateCache(
+      buildKey('workspace', workspaceId, 'members'),
+      buildKey('user', '*', 'workspaces'),   // removed user + all workspace members
+      buildKey('dashboard', '*', workspaceId)
+    );
+
+    return result;
   }
 
+  // async getWorkspaceMembers(workspaceId, userId) {
+  //   // Check if user has access
+  //   const isMember = await WorkspaceQueries.isMember(workspaceId, userId);
+  //   const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
+
+  //   if (!isMember && !isOwner) {
+  //     throw new Error('You do not have access to this workspace');
+  //   }
+
+  //   return WorkspaceQueries.getMembers(workspaceId);
+  // }
   async getWorkspaceMembers(workspaceId, userId) {
-    // Check if user has access
+    // access check (keep existing)
     const isMember = await WorkspaceQueries.isMember(workspaceId, userId);
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-
     if (!isMember && !isOwner) {
       throw new Error('You do not have access to this workspace');
     }
 
-    return WorkspaceQueries.getMembers(workspaceId);
+    const cacheKey = buildKey('workspace', workspaceId, 'members');
+
+    return cacheWrapper(cacheKey, 60, async () => {
+      return WorkspaceQueries.getMembers(workspaceId);
+    });
   }
 
   generateSlug(name) {

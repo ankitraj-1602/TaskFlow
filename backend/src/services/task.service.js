@@ -6,70 +6,73 @@ const activityService = new ActivityService();
 const NotificationService = require('./notification.service');
 const notificationService = new NotificationService();
 const { emitToWorkspace } = require('../config/socket');
+const { invalidateCache, buildKey } = require('../utils/cache.utils');
 
 class TaskService {
   async createTask(projectId, userId, data) {
-  const project = await ProjectQueries.findById(projectId);
-  if (!project) {
-    throw new Error('Project not found');
-  }
-
-  const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
-  if (!hasAccess) {
-    throw new Error('You do not have access to this project');
-  }
-
-  // Convert user_id → workspace_member_id
-  let workspaceMemberId = null;
-  if (data.assigneeId) {
-    const members = await WorkspaceQueries.getMembers(project.workspace_id);
-    const workspaceMember = members.find((m) => m.user_id === data.assigneeId);
-    if (!workspaceMember) {
-      throw new Error('Assignee is not a member of this workspace');
+    const project = await ProjectQueries.findById(projectId);
+    if (!project) {
+      throw new Error('Project not found');
     }
-    workspaceMemberId = workspaceMember.id;
-  }
 
-  const task = await TaskQueries.create({
-    title: data.title,
-    description: data.description,
-    status: data.status || 'TODO',
-    priority: data.priority || 'MEDIUM',
-    dueDate: data.dueDate,
-    storyPoints: data.storyPoints,
-    projectId,
-    createdById: userId,
-    assigneeId: workspaceMemberId,
-    reporterId: userId,
-    metadata: data.metadata,
-  });
+    const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+    if (!hasAccess) {
+      throw new Error('You do not have access to this project');
+    }
 
-  // Log activity
-  await activityService.log({
-    action: 'CREATED',
-    userId,
-    workspaceId: project.workspace_id,
-    projectId,
-    taskId: task.id,
-    changes: { title: task.title },
-  });
+    // Convert user_id → workspace_member_id
+    let workspaceMemberId = null;
+    if (data.assigneeId) {
+      const members = await WorkspaceQueries.getMembers(project.workspace_id);
+      const workspaceMember = members.find((m) => m.user_id === data.assigneeId);
+      if (!workspaceMember) {
+        throw new Error('Assignee is not a member of this workspace');
+      }
+      workspaceMemberId = workspaceMember.id;
+    }
 
-  // Notify assignee
-  if (workspaceMemberId && data.assigneeId) {
-    await notificationService.notifyTaskAssigned({
-      userId: data.assigneeId,
-      actorId: userId,
-      taskId: task.id,
-      taskTitle: task.title,
+    const task = await TaskQueries.create({
+      title: data.title,
+      description: data.description,
+      status: data.status || 'TODO',
+      priority: data.priority || 'MEDIUM',
+      dueDate: data.dueDate,
+      storyPoints: data.storyPoints,
       projectId,
-      workspaceId: project.workspace_id,
+      createdById: userId,
+      assigneeId: workspaceMemberId,
+      reporterId: userId,
+      metadata: data.metadata,
     });
-  }
 
-  // ⬇️ THE FIX: Re-fetch with joins before returning
-  const fresh = await TaskQueries.findById(task.id);
-  return this.enrichTask(fresh);
-}
+    // Log activity
+    await activityService.log({
+      action: 'CREATED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId,
+      taskId: task.id,
+      changes: { title: task.title },
+    });
+
+    // Notify assignee
+    if (workspaceMemberId && data.assigneeId) {
+      await notificationService.notifyTaskAssigned({
+        userId: data.assigneeId,
+        actorId: userId,
+        taskId: task.id,
+        taskTitle: task.title,
+        projectId,
+        workspaceId: project.workspace_id,
+      });
+    }
+
+    await this.invalidateTaskCaches(project.workspace_id);
+
+    // ⬇️ THE FIX: Re-fetch with joins before returning
+    const fresh = await TaskQueries.findById(task.id);
+    return this.enrichTask(fresh);
+  }
   async getTask(taskId, userId) {
     const task = await TaskQueries.findById(taskId);
     if (!task) {
@@ -113,241 +116,243 @@ class TaskService {
     return tasks.map(this.enrichTask);
   }
 
-async updateTask(taskId, userId, data) {
-  const task = await TaskQueries.findById(taskId);
-  if (!task) {
-    throw new Error('Task not found');
-  }
+  async updateTask(taskId, userId, data) {
+    const task = await TaskQueries.findById(taskId);
+    if (!task) {
+      throw new Error('Task not found');
+    }
 
-  const project = await ProjectQueries.findById(task.project_id);
-  const workspaceRole = await this.getWorkspaceRole(project.workspace_id, userId);
+    const project = await ProjectQueries.findById(task.project_id);
+    const workspaceRole = await this.getWorkspaceRole(project.workspace_id, userId);
 
-  if (!workspaceRole) {
-    throw new Error('You do not have access to this task');
-  }
+    if (!workspaceRole) {
+      throw new Error('You do not have access to this task');
+    }
 
-  // RBAC
-  const isOwnTask =
-    task.created_by_id === userId || task.assignee_user_id === userId;
-  const canEditAnyTask = ['MANAGER', 'ADMIN', 'OWNER'].includes(workspaceRole);
-  const canEditOwnTask = workspaceRole === 'MEMBER' && isOwnTask;
+    // RBAC
+    const isOwnTask =
+      task.created_by_id === userId || task.assignee_user_id === userId;
+    const canEditAnyTask = ['MANAGER', 'ADMIN', 'OWNER'].includes(workspaceRole);
+    const canEditOwnTask = workspaceRole === 'MEMBER' && isOwnTask;
 
-  if (!canEditAnyTask && !canEditOwnTask) {
-    throw new Error('You do not have permission to edit this task');
-  }
+    if (!canEditAnyTask && !canEditOwnTask) {
+      throw new Error('You do not have permission to edit this task');
+    }
 
-  // ⬇️ Outer scope for change tracking
-  const changes = {};
-  const updateData = {};
+    // ⬇️ Outer scope for change tracking
+    const changes = {};
+    const updateData = {};
 
-  // ─── Title ────────────────────────────────────────
-  if (data.title !== undefined && data.title !== task.title) {
-    updateData.title = data.title;
-    changes.title = { from: task.title, to: data.title };
-  }
+    // ─── Title ────────────────────────────────────────
+    if (data.title !== undefined && data.title !== task.title) {
+      updateData.title = data.title;
+      changes.title = { from: task.title, to: data.title };
+    }
 
-  // ─── Description ──────────────────────────────────
-  if (data.description !== undefined) {
-    updateData.description = data.description;
-    // Not tracked as a change (often noisy) — add if you want
-  }
+    // ─── Description ──────────────────────────────────
+    if (data.description !== undefined) {
+      updateData.description = data.description;
+      // Not tracked as a change (often noisy) — add if you want
+    }
 
-  // ─── Status ───────────────────────────────────────
-  if (data.status !== undefined && data.status !== task.status) {
-    updateData.status = data.status;
-    changes.status = { from: task.status, to: data.status };
-  }
+    // ─── Status ───────────────────────────────────────
+    if (data.status !== undefined && data.status !== task.status) {
+      updateData.status = data.status;
+      changes.status = { from: task.status, to: data.status };
+    }
 
-  // ─── Priority ─────────────────────────────────────
-  if (data.priority !== undefined && data.priority !== task.priority) {
-    updateData.priority = data.priority;
-    changes.priority = { from: task.priority, to: data.priority };
-  }
+    // ─── Priority ─────────────────────────────────────
+    if (data.priority !== undefined && data.priority !== task.priority) {
+      updateData.priority = data.priority;
+      changes.priority = { from: task.priority, to: data.priority };
+    }
 
-  // ─── Due Date ─────────────────────────────────────
-  if (data.dueDate !== undefined) {
-    updateData.due_date = data.dueDate;
-  }
+    // ─── Due Date ─────────────────────────────────────
+    if (data.dueDate !== undefined) {
+      updateData.due_date = data.dueDate;
+    }
 
-  // ─── Story Points ─────────────────────────────────
-  if (data.storyPoints !== undefined) {
-    updateData.story_points = data.storyPoints;
-  }
+    // ─── Story Points ─────────────────────────────────
+    if (data.storyPoints !== undefined) {
+      updateData.story_points = data.storyPoints;
+    }
 
-  // ─── Metadata ─────────────────────────────────────
-  if (data.metadata !== undefined) {
-    updateData.metadata = data.metadata;
-  }
+    // ─── Metadata ─────────────────────────────────────
+    if (data.metadata !== undefined) {
+      updateData.metadata = data.metadata;
+    }
 
-  // ─── Assignee ─────────────────────────────────────
-  if (data.assigneeId !== undefined) {
-    // Resolve target (user_id → workspace_member_id or null)
-    let newAssigneeId = null;
+    // ─── Assignee ─────────────────────────────────────
+    if (data.assigneeId !== undefined) {
+      // Resolve target (user_id → workspace_member_id or null)
+      let newAssigneeId = null;
 
-    if (data.assigneeId !== null && data.assigneeId !== '') {
-      const members = await WorkspaceQueries.getMembers(project.workspace_id);
-      const workspaceMember = members.find(
-        (m) => m.user_id === data.assigneeId
-      );
-      if (!workspaceMember) {
-        throw new Error('Assignee is not a member of this workspace');
+      if (data.assigneeId !== null && data.assigneeId !== '') {
+        const members = await WorkspaceQueries.getMembers(project.workspace_id);
+        const workspaceMember = members.find(
+          (m) => m.user_id === data.assigneeId
+        );
+        if (!workspaceMember) {
+          throw new Error('Assignee is not a member of this workspace');
+        }
+        newAssigneeId = workspaceMember.id;
       }
-      newAssigneeId = workspaceMember.id;
+
+      // ⬇️ Only update + log if the value ACTUALLY changed
+      const oldAssigneeId = task.assignee_id || null;
+
+      if (oldAssigneeId !== newAssigneeId) {
+        updateData.assignee_id = newAssigneeId;
+        changes.assignee = {
+          from: oldAssigneeId,
+          to: newAssigneeId,
+        };
+      }
+      // If unchanged → skip update + skip logging
     }
 
-    // ⬇️ Only update + log if the value ACTUALLY changed
-    const oldAssigneeId = task.assignee_id || null;
+    // ─── Persist ──────────────────────────────────────
+    const updated = await TaskQueries.update(taskId, updateData);
 
-    if (oldAssigneeId !== newAssigneeId) {
-      updateData.assignee_id = newAssigneeId;
-      changes.assignee = {
-        from: oldAssigneeId,
-        to: newAssigneeId,
-      };
-    }
-    // If unchanged → skip update + skip logging
-  }
-
-  // ─── Persist ──────────────────────────────────────
-  const updated = await TaskQueries.update(taskId, updateData);
-
-  // ─── Log activities ───────────────────────────────
-  if (changes.status) {
-    await activityService.log({
-      action: 'STATUS_CHANGED',
-      userId,
-      workspaceId: project.workspace_id,
-      projectId: project.id,
-      taskId,
-      changes: changes.status,
-    });
-  }
-
-  if (changes.priority) {
-    await activityService.log({
-      action: 'PRIORITY_CHANGED',
-      userId,
-      workspaceId: project.workspace_id,
-      projectId: project.id,
-      taskId,
-      changes: changes.priority,
-    });
-  }
-
-  if (changes.assignee) {
-    await activityService.log({
-      action: task.assignee_id ? 'REASSIGNED' : 'ASSIGNED',
-      userId,
-      workspaceId: project.workspace_id,
-      projectId: project.id,
-      taskId,
-      changes: changes.assignee,
-    });
-  }
-
-  // Generic update log — only if no specific changes were logged
-  const hasSpecificChange =
-    changes.status || changes.priority || changes.assignee;
-  if (!hasSpecificChange && Object.keys(changes).length > 0) {
-    await activityService.log({
-      action: 'UPDATED',
-      userId,
-      workspaceId: project.workspace_id,
-      projectId: project.id,
-      taskId,
-      changes,
-    });
-  }
-
-  if (changes.assignee && changes.assignee.to) {
-  // Find the user_id for the new workspace_member_id
-  const members = await WorkspaceQueries.getMembers(project.workspace_id);
-  const newAssignee = members.find((m) => m.id === changes.assignee.to);
-  if (newAssignee) {
-    await notificationService.notifyTaskAssigned({
-      userId: newAssignee.user_id,
-      actorId: userId,
-      taskId,
-      taskTitle: updated.title,
-      projectId: project.id,
-    });
-  }
-}
-
-const fresh = await TaskQueries.findById(taskId);
-emitToWorkspace(project.workspace_id, 'task:updated', {
-  task: this.enrichTask(fresh),
-  projectId: project.id,
-  workspaceId: project.workspace_id,
-  actorId: userId,
-});
-
-  // Re-fetch with all joins
-  return this.enrichTask(fresh);
-}
-async updateTaskStatus(taskId, userId, status, position) {
-  const task = await TaskQueries.findById(taskId);
-  if (!task) throw new Error('Task not found');
-
-  const project = await ProjectQueries.findById(task.project_id);
-  const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
-  if (!hasAccess) throw new Error('You do not have access to this task');
-
-  const oldStatus = task.status;
-  const oldPosition = task.position;
-
-  await TaskQueries.updateStatus(taskId, status, position);
-
-  if (oldStatus !== status) {
-    await activityService.log({
-      action: status === 'DONE' ? 'COMPLETED' : 'STATUS_CHANGED',
-      userId,
-      workspaceId: project.workspace_id,
-      projectId: project.id,
-      taskId,
-      changes: { from: oldStatus, to: status },
-    });
-  } else if (oldPosition !== position) {
-    await activityService.log({
-      action: 'MOVED',
-      userId,
-      workspaceId: project.workspace_id,
-      projectId: project.id,
-      taskId,
-      changes: { from: oldPosition, to: position },
-    });
-  }
-
-  if (oldStatus !== status) {
-    const members = await WorkspaceQueries.getMembers(project.workspace_id);
-    const assignee = members.find((m) => m.id === task.assignee_id);
-    if (assignee && assignee.user_id !== userId) {
-      await notificationService.notifyStatusChanged({
-        userId: assignee.user_id,
-        actorId: userId,
-        taskId,
-        taskTitle: task.title,
-        from: oldStatus,
-        to: status,
+    // ─── Log activities ───────────────────────────────
+    if (changes.status) {
+      await activityService.log({
+        action: 'STATUS_CHANGED',
+        userId,
+        workspaceId: project.workspace_id,
         projectId: project.id,
+        taskId,
+        changes: changes.status,
       });
     }
+
+    if (changes.priority) {
+      await activityService.log({
+        action: 'PRIORITY_CHANGED',
+        userId,
+        workspaceId: project.workspace_id,
+        projectId: project.id,
+        taskId,
+        changes: changes.priority,
+      });
+    }
+
+    if (changes.assignee) {
+      await activityService.log({
+        action: task.assignee_id ? 'REASSIGNED' : 'ASSIGNED',
+        userId,
+        workspaceId: project.workspace_id,
+        projectId: project.id,
+        taskId,
+        changes: changes.assignee,
+      });
+    }
+
+    // Generic update log — only if no specific changes were logged
+    const hasSpecificChange =
+      changes.status || changes.priority || changes.assignee;
+    if (!hasSpecificChange && Object.keys(changes).length > 0) {
+      await activityService.log({
+        action: 'UPDATED',
+        userId,
+        workspaceId: project.workspace_id,
+        projectId: project.id,
+        taskId,
+        changes,
+      });
+    }
+
+    if (changes.assignee && changes.assignee.to) {
+      // Find the user_id for the new workspace_member_id
+      const members = await WorkspaceQueries.getMembers(project.workspace_id);
+      const newAssignee = members.find((m) => m.id === changes.assignee.to);
+      if (newAssignee) {
+        await notificationService.notifyTaskAssigned({
+          userId: newAssignee.user_id,
+          actorId: userId,
+          taskId,
+          taskTitle: updated.title,
+          projectId: project.id,
+        });
+      }
+    }
+
+    const fresh = await TaskQueries.findById(taskId);
+    emitToWorkspace(project.workspace_id, 'task:updated', {
+      task: this.enrichTask(fresh),
+      projectId: project.id,
+      workspaceId: project.workspace_id,
+      actorId: userId,
+    });
+
+    await this.invalidateTaskCaches(project.workspace_id);
+
+    // Re-fetch with all joins
+    return this.enrichTask(fresh);
   }
+  async updateTaskStatus(taskId, userId, status, position) {
+    const task = await TaskQueries.findById(taskId);
+    if (!task) throw new Error('Task not found');
 
-  const fresh = await TaskQueries.findById(taskId);
-  emitToWorkspace(project.workspace_id, 'task:moved', {
-  taskId,
-  status,
-  position,
-  projectId: project.id,
-  workspaceId: project.workspace_id,
-  actorId: userId,
-});
+    const project = await ProjectQueries.findById(task.project_id);
+    const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+    if (!hasAccess) throw new Error('You do not have access to this task');
 
-  return this.enrichTask(fresh);
-}
-    // return this.enrichTask(updated);
-//   }
+    const oldStatus = task.status;
+    const oldPosition = task.position;
+
+    await TaskQueries.updateStatus(taskId, status, position);
+
+    if (oldStatus !== status) {
+      await activityService.log({
+        action: status === 'DONE' ? 'COMPLETED' : 'STATUS_CHANGED',
+        userId,
+        workspaceId: project.workspace_id,
+        projectId: project.id,
+        taskId,
+        changes: { from: oldStatus, to: status },
+      });
+    } else if (oldPosition !== position) {
+      await activityService.log({
+        action: 'MOVED',
+        userId,
+        workspaceId: project.workspace_id,
+        projectId: project.id,
+        taskId,
+        changes: { from: oldPosition, to: position },
+      });
+    }
+
+    if (oldStatus !== status) {
+      const members = await WorkspaceQueries.getMembers(project.workspace_id);
+      const assignee = members.find((m) => m.id === task.assignee_id);
+      if (assignee && assignee.user_id !== userId) {
+        await notificationService.notifyStatusChanged({
+          userId: assignee.user_id,
+          actorId: userId,
+          taskId,
+          taskTitle: task.title,
+          from: oldStatus,
+          to: status,
+          projectId: project.id,
+        });
+      }
+    }
+
+    const fresh = await TaskQueries.findById(taskId);
+    emitToWorkspace(project.workspace_id, 'task:moved', {
+      taskId,
+      status,
+      position,
+      projectId: project.id,
+      workspaceId: project.workspace_id,
+      actorId: userId,
+    });
+
+    await this.invalidateTaskCaches(project.workspace_id);
+
+    return this.enrichTask(fresh);
+  }
 
   async reorderTasks(projectId, userId, status, taskIds) {
     const project = await ProjectQueries.findById(projectId);
@@ -361,6 +366,9 @@ async updateTaskStatus(taskId, userId, status, position) {
     }
 
     await TaskQueries.reorderTasks(projectId, status, taskIds);
+
+    await this.invalidateTaskCaches(project.workspace_id);
+
     return true;
   }
 
@@ -377,22 +385,23 @@ async updateTaskStatus(taskId, userId, status, position) {
     }
 
     await activityService.log({
-    action: 'DELETED',
-    userId,
-    workspaceId: project.workspace_id,
-    projectId: project.id,
-    taskId,
-    changes: { title: task.title },
-  });
+      action: 'DELETED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId: project.id,
+      taskId,
+      changes: { title: task.title },
+    });
 
-  emitToWorkspace(project.workspace_id, 'task:deleted', {
-  taskId,
-  projectId: project.id,
-  workspaceId: project.workspace_id,
-  actorId: userId,
-});
+    emitToWorkspace(project.workspace_id, 'task:deleted', {
+      taskId,
+      projectId: project.id,
+      workspaceId: project.workspace_id,
+      actorId: userId,
+    });
 
     await TaskQueries.delete(taskId);
+    await this.invalidateTaskCaches(project.workspace_id);
     return true;
   }
 
@@ -410,22 +419,22 @@ async updateTaskStatus(taskId, userId, status, position) {
 
     const result = await TaskQueries.archive(taskId);
 
-  await activityService.log({
-    action: 'ARCHIVED',
-    userId,
-    workspaceId: project.workspace_id,
-    projectId: project.id,
-    taskId,
-  });
+    await activityService.log({
+      action: 'ARCHIVED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId: project.id,
+      taskId,
+    });
 
-  emitToWorkspace(project.workspace_id, 'task:archived', {
-  taskId,
-  projectId: project.id,
-  workspaceId: project.workspace_id,
-});
+    emitToWorkspace(project.workspace_id, 'task:archived', {
+      taskId,
+      projectId: project.id,
+      workspaceId: project.workspace_id,
+    });
 
-
-  return result;
+    await this.invalidateTaskCaches(project.workspace_id);
+    return result;
   }
 
   async unarchiveTask(taskId, userId) {
@@ -442,45 +451,51 @@ async updateTaskStatus(taskId, userId, status, position) {
 
     const result = await TaskQueries.unarchive(taskId);
 
-  await activityService.log({
-    action: 'RESTORED',
-    userId,
-    workspaceId: project.workspace_id,
-    projectId: project.id,
-    taskId,
-  });
+    await activityService.log({
+      action: 'RESTORED',
+      userId,
+      workspaceId: project.workspace_id,
+      projectId: project.id,
+      taskId,
+    });
 
-  emitToWorkspace(project.workspace_id, 'task:unarchived', {
-  taskId,
-  projectId: project.id,
-  workspaceId: project.workspace_id,
-});
+    emitToWorkspace(project.workspace_id, 'task:unarchived', {
+      taskId,
+      projectId: project.id,
+      workspaceId: project.workspace_id,
+    });
 
-// For unarchive: 'task:unarchived'
-  return result;
+    await this.invalidateTaskCaches(project.workspace_id);
+
+    // For unarchive: 'task:unarchived'
+    return result;
   }
 
   async duplicateTask(taskId, userId) {
     const task = await TaskQueries.findById(taskId);
-    if (!task) {
-      throw new Error('Task not found');
-    }
+    if (!task) throw new Error('Task not found');
 
     const project = await ProjectQueries.findById(task.project_id);
     const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
-    if (!hasAccess) {
-      throw new Error('You do not have access to this task');
-    }
+    if (!hasAccess) throw new Error('You do not have access to this task');
+
+    // ⬇️ Duplicate FIRST, THEN emit
+    const duplicated = await TaskQueries.duplicate(taskId, userId);
+
+    // Re-fetch with joins
+    const fresh = await TaskQueries.findById(duplicated.id);
 
     emitToWorkspace(project.workspace_id, 'task:created', {
-  task: this.enrichTask(duplicated),
-  projectId: project.id,
-  workspaceId: project.workspace_id,
-  actorId: userId,
-});
+      task: this.enrichTask(fresh),
+      projectId: project.id,
+      workspaceId: project.workspace_id,
+      actorId: userId,
+    });
 
-    const duplicated = await TaskQueries.duplicate(taskId, userId);
-    return this.enrichTask(duplicated);
+    // ⬇️ INVALIDATE
+    await this.invalidateTaskCaches(project.workspace_id);
+
+    return this.enrichTask(fresh);
   }
 
   async getTaskStats(projectId, userId) {
@@ -519,48 +534,52 @@ async updateTaskStatus(taskId, userId, status, position) {
     const tasks = await TaskQueries.getMyTasks(userId, filters);
     return tasks.map(this.enrichTask);
   }
-  
+
 
   // Helper methods
-enrichTask(task) {
-  if (!task) return null;
+  enrichTask(task) {
+    if (!task) return null;
 
-  return {
-    id: task.id,
-    title: task.title,
-    description: task.description,
-    status: task.status,
-    priority: task.priority,
-    dueDate: task.due_date,
-    storyPoints: task.story_points,
-    position: task.position,
-    isArchived: task.is_archived,
-    metadata: task.metadata,
-    projectId: task.project_id,
-    projectName: task.project_name,
-    workspaceId: task.workspace_id,
-    createdById: task.created_by_id,
-    createdByName: task.created_by_name,
-    createdByEmail: task.created_by_email,
-    assigneeId: task.assignee_id,
-    assigneeUserId: task.assignee_user_id,
-    assigneeName: task.assignee_name,
-    assigneeEmail: task.assignee_email,
-    assigneePicture: task.assignee_picture,
-    reporterId: task.reporter_id,
-    reporterName: task.reporter_name,
-    commentCount: parseInt(task.comment_count || 0),
-    attachmentCount: parseInt(task.attachment_count || 0),
-    createdAt: task.created_at,
-    updatedAt: task.updated_at,
-    completedAt: task.completed_at,
-  };
-}
+    return {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      dueDate: task.due_date,
+      storyPoints: task.story_points,
+      position: task.position,
+      isArchived: task.is_archived,
+      metadata: task.metadata,
+      projectId: task.project_id,
+      projectName: task.project_name,
+      workspaceId: task.workspace_id,
+      createdById: task.created_by_id,
+      createdByName: task.created_by_name,
+      createdByEmail: task.created_by_email,
+      assigneeId: task.assignee_id,
+      assigneeUserId: task.assignee_user_id,
+      assigneeName: task.assignee_name,
+      assigneeEmail: task.assignee_email,
+      assigneePicture: task.assignee_picture,
+      reporterId: task.reporter_id,
+      reporterName: task.reporter_name,
+      commentCount: parseInt(task.comment_count || 0),
+      attachmentCount: parseInt(task.attachment_count || 0),
+      createdAt: task.created_at,
+      updatedAt: task.updated_at,
+      completedAt: task.completed_at,
+    };
+  }
 
   async checkWorkspaceAccess(workspaceId, userId) {
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
     if (isOwner) return true;
     return WorkspaceQueries.isMember(workspaceId, userId);
+  }
+
+  async invalidateTaskCaches(workspaceId) {
+    await invalidateCache(buildKey('dashboard', '*', workspaceId));
   }
 
   async checkProjectAccess(project, userId) {
@@ -573,10 +592,10 @@ enrichTask(task) {
   }
 
   async getWorkspaceRole(workspaceId, userId) {
-  const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-  if (isOwner) return 'OWNER';
-  return WorkspaceQueries.getUserRole(workspaceId, userId);
-}
+    const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
+    if (isOwner) return 'OWNER';
+    return WorkspaceQueries.getUserRole(workspaceId, userId);
+  }
 }
 
 module.exports = TaskService;
