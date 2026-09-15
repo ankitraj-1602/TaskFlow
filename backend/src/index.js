@@ -27,6 +27,7 @@ const WorkspaceController = require('./controllers/workspace.controller');
 const { connectRedis } = require('./config/redis');
 const pool = require('./config/database');
 const { isRedisReady } = require('./config/redis');
+const attachmentRoutes = require('./routes/attachment.routes');
 
 
 const { startScheduler } = require('./jobs/scheduler');
@@ -67,6 +68,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api', commentRoutes);
 app.use('/api', activityRoutes);
 app.use('/api', dashboardRoutes);
+// After other routes:
+app.use('/api', attachmentRoutes);
 
 app.get('/api/me/projects', authenticate, ProjectController.getMyProjects);
 app.get('/api/me/team', authenticate, WorkspaceController.getMyTeam);
