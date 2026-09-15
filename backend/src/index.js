@@ -31,6 +31,7 @@ const attachmentRoutes = require('./routes/attachment.routes');
 
 
 const { startScheduler } = require('./jobs/scheduler');
+const AttachmentController = require('./controllers/attachment.controller');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -69,6 +70,9 @@ app.use('/api', commentRoutes);
 app.use('/api', activityRoutes);
 app.use('/api', dashboardRoutes);
 // After other routes:
+app.get('/uploads/:year/:month/:filename', AttachmentController.serve);
+
+// API routes
 app.use('/api', attachmentRoutes);
 
 app.get('/api/me/projects', authenticate, ProjectController.getMyProjects);

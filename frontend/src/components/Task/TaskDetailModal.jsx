@@ -11,6 +11,7 @@ import { useProjectStore } from '../../store/project.store';
 import { usePermission } from '../../hooks/usePermission';
 import { ActivityFeed } from '../Activity/ActivityFeed';
 import { useActivityStore } from '../../store/activity.store';
+import { AttachmentList } from '../Attachment/AttachmentList';
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -52,15 +53,15 @@ export const TaskDetailModal = ({
   // ──────────────────────────────────────────────────
 
   // ─── Load project members for @mention autocomplete
-useEffect(() => {
-  if (isOpen && task?.projectId) {
-    loadProjectMembers(task.projectId);
-  }
-  if (isOpen && task?.id) {
-    // Refresh activity every time the modal opens
-    invalidateTask(task.id);
-  }
-}, [isOpen, task?.projectId, task?.id]);
+  useEffect(() => {
+    if (isOpen && task?.projectId) {
+      loadProjectMembers(task.projectId);
+    }
+    if (isOpen && task?.id) {
+      // Refresh activity every time the modal opens
+      invalidateTask(task.id);
+    }
+  }, [isOpen, task?.projectId, task?.id]);
   // ──────────────────────────────────────────────────
 
   if (!task) return null;
@@ -159,9 +160,8 @@ useEffect(() => {
           <div>
             <dt className="text-xs font-medium text-gray-500 mb-1">Due Date</dt>
             <dd
-              className={`text-sm ${
-                isOverdue ? 'text-red-600 font-medium' : 'text-gray-900'
-              }`}
+              className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-900'
+                }`}
             >
               {task.dueDate
                 ? new Date(task.dueDate).toLocaleDateString()
@@ -207,9 +207,13 @@ useEffect(() => {
           <CommentList taskId={task.id} workspaceRole={workspaceRole} />
         </div>
         <div className="pt-4 border-t border-gray-100">
-  <h4 className="text-sm font-semibold text-gray-900 mb-2">Activity</h4>
-  <ActivityFeed scope="task" id={task.id} compact />
-</div>
+          <h4 className="text-sm font-semibold text-gray-900 mb-2">Activity</h4>
+          <ActivityFeed scope="task" id={task.id} compact />
+        </div>
+
+        <div className="pt-4 border-t border-gray-200">
+          <AttachmentList taskId={task.id} workspaceRole={workspaceRole} />
+        </div>
 
         {/* Actions */}
         {hasAnyAction ? (

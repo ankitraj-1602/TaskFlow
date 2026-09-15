@@ -5,6 +5,7 @@ import { useTaskStore } from '../store/task.store';
 import { useCommentStore } from '../store/comment.store';
 import { useActivityStore } from '../store/activity.store';
 import { useNotificationStore } from '../store/notification.store';
+import { useAttachmentStore } from '../store/attachment.store';
 
 export const useSocketEvents = () => {
   const { socket } = useSocketStore();
@@ -67,6 +68,20 @@ export const useSocketEvents = () => {
       if (projectId) useActivityStore.getState().invalidateProject(projectId);
     };
 
+    // ─── Attachment events ───────────────────────────
+    const onAttachmentCreated = ({ attachment, taskId, actorId }) => {
+      if (actorId === getCurrentUserId()) return;
+      useAttachmentStore.getState().addAttachmentFromSocket(attachment, taskId);
+    };
+
+    const onAttachmentDeleted = ({ attachmentId, taskId, actorId }) => {
+      if (actorId === getCurrentUserId()) return;
+      useAttachmentStore.getState().removeAttachmentFromSocket(attachmentId, taskId);
+    };
+
+    socket.on('attachment:created', onAttachmentCreated);
+    socket.on('attachment:deleted', onAttachmentDeleted);
+
     socket.on('task:created', onTaskCreated);
     socket.on('task:updated', onTaskUpdated);
     socket.on('task:moved', onTaskMoved);
@@ -87,6 +102,8 @@ export const useSocketEvents = () => {
       socket.off('comment:deleted', onCommentDeleted);
       socket.off('notification:new', onNotificationNew);
       socket.off('activity:new', onActivityNew);
+      socket.off('attachment:created', onAttachmentCreated);
+      socket.off('attachment:deleted', onAttachmentDeleted);
     };
   }, [socket]);
 };
