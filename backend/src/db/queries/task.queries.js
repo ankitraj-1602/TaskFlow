@@ -391,7 +391,7 @@ static async countByProject(projectId, filters = {}) {
           WHEN 'LOW' THEN 4 
         END,
         t.due_date ASC NULLS LAST
-      LIMIT 100
+      
     `;
     const result = await QueryHelper.query(query, values);
     return result.rows;

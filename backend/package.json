@@ -4,7 +4,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+     "seed": "node scripts/seed.js",
+    "seed:clean": "node scripts/seed.js --clean",
+    "seed:clean-only": "node scripts/seed.js --clean-only"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +30,7 @@
     "uuid": "^14.0.2"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.6.0",
     "@types/nodemailer": "^8.0.1",
     "nodemon": "^3.1.14"
   }

@@ -208,7 +208,7 @@ class TaskController {
       if (projectId) filters.projectId = projectId;
 
       const tasks = await taskService.getMyTasks(userId, filters);
-
+      console.log(tasks.length)
       successResponse(res, tasks, 'Tasks retrieved successfully');
     } catch (error) {
       errorResponse(res, error.message, 500);
