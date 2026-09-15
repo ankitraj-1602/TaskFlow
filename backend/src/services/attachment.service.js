@@ -117,7 +117,7 @@ class AttachmentService {
 
         // Emit event
         emitToWorkspace(project.workspace_id, 'attachment:deleted', {
-            attachmentId: id,
+            attachmentId,
             taskId: attachment.task_id,
             projectId: project.id,
             workspaceId: project.workspace_id,
