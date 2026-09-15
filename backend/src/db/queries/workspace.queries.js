@@ -64,15 +64,16 @@ class WorkspaceQueries {
 
   static async findByUser(userId) {
     const query = `
-      SELECT DISTINCT w.*, 
-        (SELECT role FROM workspace_members WHERE workspace_id = w.id AND user_id = $1) as member_role,
-        CASE WHEN w.owner_id = $1 THEN 'OWNER' ELSE NULL END as owner_role
-      FROM workspaces w
-      LEFT JOIN workspace_members wm ON w.id = wm.workspace_id
-      WHERE (w.owner_id = $1 OR wm.user_id = $1)
-      AND w.deleted_at IS NULL
-      ORDER BY w.created_at DESC
-    `;
+    SELECT DISTINCT w.*, 
+      (SELECT role FROM workspace_members WHERE workspace_id = w.id AND user_id = $1) as member_role,
+      CASE WHEN w.owner_id = $1 THEN 'OWNER' ELSE NULL END as owner_role,
+      (SELECT COUNT(*) FROM workspace_members WHERE workspace_id = w.id) as member_count
+    FROM workspaces w
+    LEFT JOIN workspace_members wm ON w.id = wm.workspace_id
+    WHERE (w.owner_id = $1 OR wm.user_id = $1)
+    AND w.deleted_at IS NULL
+    ORDER BY w.created_at DESC
+  `;
     const result = await QueryHelper.query(query, [userId]);
     return result.rows;
   }
@@ -145,10 +146,10 @@ class WorkspaceQueries {
    * Fetch all members of a workspace. CACHED.
    * Key: workspace:<id>:members-list
    */
-static async getMembers(workspaceId) {
-  const cacheKey = buildKey('workspace', workspaceId, 'members-list');
-  return cacheWrapper(cacheKey, 60, async () => {
-    const query = `
+  static async getMembers(workspaceId) {
+    const cacheKey = buildKey('workspace', workspaceId, 'members-list');
+    return cacheWrapper(cacheKey, 60, async () => {
+      const query = `
       SELECT 
         wm.id, wm.role, wm.joined_at, wm.invited_by, wm.invited_at,
         u.id as user_id, u.name, u.email, u.profile_picture, u.job_title
@@ -158,10 +159,10 @@ static async getMembers(workspaceId) {
         AND u.deleted_at IS NULL   -- ⬅️ ADD
       ORDER BY wm.role DESC, u.name ASC
     `;
-    const result = await QueryHelper.query(query, [workspaceId]);
-    return result.rows;
-  });
-}
+      const result = await QueryHelper.query(query, [workspaceId]);
+      return result.rows;
+    });
+  }
 
   static async updateMemberRole(workspaceId, memberId, role) {
     const query = `
@@ -272,17 +273,17 @@ static async getMembers(workspaceId) {
     return result.rows;
   }
   static async findMemberByIdCached(workspaceId, memberId) {
-  const cacheKey = buildKey('workspace', workspaceId, 'member-by-id', memberId);
-  return cacheWrapper(cacheKey, 60, async () => {
-    const query = `
+    const cacheKey = buildKey('workspace', workspaceId, 'member-by-id', memberId);
+    return cacheWrapper(cacheKey, 60, async () => {
+      const query = `
       SELECT wm.id, wm.user_id, wm.role
       FROM workspace_members wm
       WHERE wm.id = $1 AND wm.workspace_id = $2
     `;
-    const result = await QueryHelper.query(query, [memberId, workspaceId]);
-    return result.rows[0] || null;
-  });
-}
+      const result = await QueryHelper.query(query, [memberId, workspaceId]);
+      return result.rows[0] || null;
+    });
+  }
 }
 
 module.exports = WorkspaceQueries;

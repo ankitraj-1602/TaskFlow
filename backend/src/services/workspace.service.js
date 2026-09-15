@@ -23,7 +23,7 @@ class WorkspaceService {
       buildKey('workspace', workspaceId, 'ismember', memberUserId),
       buildKey('workspace', workspaceId, 'role', memberUserId),
       buildKey('workspace', workspaceId, 'member-of-user', memberUserId),
-      buildKey('user', memberUserId, 'workspaces'),
+      buildKey('user', '*', 'workspaces'),
       buildKey('dashboard', '*', workspaceId)
     );
   }
@@ -61,7 +61,13 @@ class WorkspaceService {
   async getUserWorkspaces(userId) {
     const cacheKey = buildKey('user', userId, 'workspaces');
     return cacheWrapper(cacheKey, 120, async () => {
-      return WorkspaceQueries.findByUser(userId);
+      const workspaces = await WorkspaceQueries.findByUser(userId);
+
+      // Normalize member_count to a number
+      return workspaces.map((w) => ({
+        ...w,
+        member_count: parseInt(w.member_count || 0, 10),
+      }));
     });
   }
 

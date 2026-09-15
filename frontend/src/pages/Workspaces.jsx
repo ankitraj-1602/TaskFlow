@@ -151,7 +151,7 @@ export const Workspaces = () => {
                   <div className="mt-5 pt-4 border-t border-gray-50 flex items-center justify-between text-sm">
                     <div className="flex items-center text-gray-500">
                       <UsersIcon className="h-4 w-4 mr-1.5" />
-                      <span>0 members</span>
+                      <span>{workspace.member_count ?? 0} members</span>
                     </div>
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${isOwner ? accent.badge : 'bg-gray-100 text-gray-700'}`}>
                       {isOwner ? 'Owner' : workspace.member_role || 'Member'}
