@@ -21,7 +21,7 @@ const CONFIG = {
   TASKS_PER_PROJECT: 250,        // 200 * 250 = 50,000 tasks
   COMMENT_CHANCE: 0.1,           // 10% tasks get a comment → 5k comments
   BATCH_SIZE: 1000,
-  SEED_EMAIL_SUFFIX: '@seed.test', // so we can identify + clean seeded users
+  SEED_EMAIL_SUFFIX: '@seed.dev', // so we can identify + clean seeded users
 };
 
 const TASK_STATUSES = ['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED'];
