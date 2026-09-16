@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 require('dotenv').config();
+const isProduction = process.env.NODE_ENV === 'production';
 
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -9,7 +10,8 @@ const pool = new Pool({
   database: process.env.DB_NAME,
   max: 50,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 5000,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
 });
 
 // Test connection
