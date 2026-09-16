@@ -16,6 +16,7 @@
   "dependencies": {
     "@bull-board/api": "^9.10.1",
     "@bull-board/express": "^9.10.1",
+    "@tanstack/react-query": "^5.102.8",
     "bcryptjs": "^3.0.3",
     "bullmq": "^6.3.6",
     "compression": "^1.8.1",

@@ -10,22 +10,54 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
 import { useNotificationStore } from '../../store/notification.store';
 import { NotificationDropdown } from '../Notification/NotificationDropdown';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { CommandPalette } from '../Search/CommandPalette';
 
 export const Navbar = () => {
   const { user, logout } = useAuthStore();
   const { unreadCount, startPolling, stopPolling,loadUnreadCount } = useNotificationStore();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
+  useEffect(() => {
+  const handler = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      setShowSearch(true);
+    }
+  };
+  document.addEventListener('keydown', handler);
+  return () => document.removeEventListener('keydown', handler);
+}, []);
+
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="flex items-center justify-end px-6 py-3">
 
+<button
+  onClick={() => setShowSearch(true)}
+  className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm text-gray-500 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors w-64"
+>
+  <MagnifyingGlassIcon className="h-4 w-4" />
+  <span>Search...</span>
+  <kbd className="ml-auto text-[10px] font-semibold text-gray-400 border border-gray-300 rounded px-1.5 py-0.5">
+    ⌘K
+  </kbd>
+</button>
+
+{/* For mobile — just icon */}
+<button
+  onClick={() => setShowSearch(true)}
+  className="md:hidden text-gray-500 hover:text-gray-700 p-1"
+>
+  <MagnifyingGlassIcon className="h-6 w-6" />
+</button>
         <div className="flex items-center space-x-4">
           {/* Notification bell */}
           <div className="relative">
@@ -136,6 +168,11 @@ export const Navbar = () => {
           </Menu>
         </div>
       </div>
+      <CommandPalette
+  isOpen={showSearch}
+  onClose={() => setShowSearch(false)}
+/>
     </header>
+    
   );
 };

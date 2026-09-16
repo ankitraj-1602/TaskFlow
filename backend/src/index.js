@@ -28,7 +28,7 @@ const { connectRedis } = require('./config/redis');
 const pool = require('./config/database');
 const { isRedisReady } = require('./config/redis');
 const attachmentRoutes = require('./routes/attachment.routes');
-
+const searchRoutes = require('./routes/search.routes');
 
 const { startScheduler } = require('./jobs/scheduler');
 const AttachmentController = require('./controllers/attachment.controller');
@@ -74,6 +74,8 @@ app.get('/uploads/:year/:month/:filename', AttachmentController.serve);
 
 // API routes
 app.use('/api', attachmentRoutes);
+
+app.use('/api/search', searchRoutes);
 
 app.get('/api/me/projects', authenticate, ProjectController.getMyProjects);
 app.get('/api/me/team', authenticate, WorkspaceController.getMyTeam);

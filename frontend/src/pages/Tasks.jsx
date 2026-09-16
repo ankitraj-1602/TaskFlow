@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ProtectedLayout } from '../components/Layout/ProtectedLayout';
 import { Button } from '../components/Forms/Button';
@@ -11,6 +11,7 @@ import { TaskDetailModal } from '../components/Task/TaskDetailModal';
 import { useTaskStore } from '../store/task.store';
 import { useWorkspaceStore } from '../store/workspace.store';
 import { usePermission } from '../hooks/usePermission';
+import { taskApi } from '../api/task.api';
 import {
   PlusIcon,
   MagnifyingGlassIcon,
@@ -22,6 +23,8 @@ import {
 export const Tasks = () => {
   const { workspaceId, projectId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();   // ⬅️ ADDED
+
   const { tasks, loadProjectTasks, isLoading, pagination } = useTaskStore();
   const { workspaces, loadWorkspaces } = useWorkspaceStore();
 
@@ -38,7 +41,7 @@ export const Tasks = () => {
   const [sortOrder, setSortOrder] = useState('asc');
   const [page, setPage] = useState(1);
 
-  // ─── RBAC: Derive workspace role ──────────────────────────
+  // RBAC
   const workspace = workspaces.find((w) => w.id === workspaceId);
   const workspaceRole = workspace
     ? workspace.owner_role === 'OWNER'
@@ -47,33 +50,48 @@ export const Tasks = () => {
     : 'VIEWER';
 
   const { isMember, isManager } = usePermission(workspaceRole);
-  // isMember = OWNER | ADMIN | MANAGER | MEMBER
-  // isManager = OWNER | ADMIN | MANAGER
-  // ──────────────────────────────────────────────────────────
 
-  // Ensure workspaces are loaded (in case user lands here directly)
+  // Ensure workspaces are loaded
   useEffect(() => {
     if (workspaces.length === 0) {
       loadWorkspaces().catch(() => {});
     }
   }, []);
 
-  const loadTasks = () => {
-    const filters = {
-      search: searchQuery || undefined,
-      status: statusFilter || undefined,
-      priority: priorityFilter || undefined,
-      sortBy,
-      sortOrder,
-      page,
-      limit: 20,
-    };
-    loadProjectTasks(projectId, filters);
+const loadTasks = () => {
+  if (!projectId) {
+    console.warn('⚠️ loadTasks called without projectId — skipping');
+    return;
+  }
+  
+  const filters = {
+    search: searchQuery || undefined,
+    status: statusFilter || undefined,
+    priority: priorityFilter || undefined,
+    sortBy,
+    sortOrder,
+    page,
+    limit: 20,
   };
+  loadProjectTasks(projectId, filters);
+};
 
-  useEffect(() => {
-    loadTasks();
-  }, [projectId, statusFilter, priorityFilter, sortBy, sortOrder, page]);
+useEffect(() => {
+  if (!projectId) return;
+  loadTasks();
+}, [projectId, statusFilter, priorityFilter, sortBy, sortOrder, page]);
+
+useEffect(() => {
+  if (!projectId) return;
+  
+  const timer = setTimeout(() => {
+    if (searchQuery !== undefined) {
+      setPage(1);
+      loadTasks();
+    }
+  }, 400);
+  return () => clearTimeout(timer);
+}, [searchQuery, projectId]);
 
   // Debounce search
   useEffect(() => {
@@ -85,6 +103,30 @@ export const Tasks = () => {
     }, 400);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // ─── ⬇️ DEEP-LINK: Open task modal from ?taskId=xxx ───
+  useEffect(() => {
+    const taskIdParam = searchParams.get('taskId');
+    if (!taskIdParam) return;
+
+    const fetchAndOpenTask = async () => {
+      try {
+        const task = await taskApi.getById(taskIdParam);
+        setSelectedTask(task);
+        setShowDetail(true);
+      } catch (error) {
+        toast.error('Task not found or you do not have access');
+      } finally {
+        // Clean URL — remove query param so refresh doesn't reopen
+        const next = new URLSearchParams(searchParams);
+        next.delete('taskId');
+        setSearchParams(next, { replace: true });
+      }
+    };
+
+    fetchAndOpenTask();
+  }, [searchParams, setSearchParams]);
+  // ────────────────────────────────────────────────────────
 
   const handleTaskClick = (task) => {
     setSelectedTask(task);
@@ -141,7 +183,6 @@ export const Tasks = () => {
               Board View
             </Button>
 
-            {/* ⬇️ RBAC: Only MEMBER+ can create tasks */}
             {isMember && (
               <Button onClick={() => setShowCreateModal(true)}>
                 <PlusIcon className="h-5 w-5 mr-2" />
@@ -390,7 +431,7 @@ export const Tasks = () => {
           </div>
         )}
 
-        {/* Create/Edit Task Modal — RBAC: only for MEMBER+ */}
+        {/* Create/Edit Task Modal */}
         {isMember && (
           <>
             <TaskModal
@@ -411,7 +452,7 @@ export const Tasks = () => {
           </>
         )}
 
-        {/* Task Detail Modal — always available, RBAC handled internally */}
+        {/* Task Detail Modal */}
         <TaskDetailModal
           isOpen={showDetail}
           onClose={() => {
