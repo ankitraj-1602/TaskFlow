@@ -5,7 +5,7 @@ name: CI
 # ─────────────────────────────────────────────────────────────
 on:
   push:
-    branches: [development, main]
+    branches: [JestTesting, main]
   pull_request:
     branches: [main]
 
