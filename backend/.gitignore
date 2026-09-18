@@ -7,3 +7,8 @@ dist/
 *.db
 
 uploads/
+
+coverage/
+test-output.txt
+
+.env.test
