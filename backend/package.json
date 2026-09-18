@@ -7,7 +7,10 @@
     "start": "node src/index.js",
     "seed": "node scripts/seed.js",
     "seed:clean": "node scripts/seed.js --clean",
-    "seed:clean-only": "node scripts/seed.js --clean-only"
+    "seed:clean-only": "node scripts/seed.js --clean-only",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [],
   "author": "",
@@ -39,6 +42,8 @@
   "devDependencies": {
     "@faker-js/faker": "^10.6.0",
     "@types/nodemailer": "^8.0.1",
-    "nodemon": "^3.1.14"
+    "jest": "^30.5.1",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
   }
 }
