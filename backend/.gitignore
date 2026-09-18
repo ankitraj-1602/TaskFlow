@@ -7,3 +7,10 @@ dist/
 *.db
 
 uploads/
+
+.env.test
+
+
+.env.test
+coverage/
+test-output.txt
