@@ -942,43 +942,43 @@ class TaskService {
 
     return true;
   }
+async deleteTask(taskId, userId) {
+  const task = await TaskQueries.findById(taskId);
+  if (!task) throw new Error('Task not found');
 
-  async deleteTask(taskId, userId) {
-    const task = await TaskQueries.findById(taskId);
-    if (!task) throw new Error('Task not found');
+  const project = await ProjectQueries.findById(task.project_id);
+  const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+  if (!hasAccess) throw new Error('You do not have access to this task');
 
-    const project = await ProjectQueries.findById(task.project_id);
-    const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
-    if (!hasAccess) throw new Error('You do not have access to this task');
+  await activityService.log({
+    action: 'DELETED',
+    userId,
+    workspaceId: project.workspace_id,
+    projectId: project.id,
+    taskId,
+    changes: { title: task.title },
+  });
 
-    await activityService.log({
-      action: 'DELETED',
-      userId,
-      workspaceId: project.workspace_id,
-      projectId: project.id,
-      taskId,
-      changes: { title: task.title },
-    });
+  emitToWorkspace(project.workspace_id, 'task:deleted', {
+    taskId,
+    projectId: project.id,
+    workspaceId: project.workspace_id,
+    actorId: userId,
+  });
 
-    emitToWorkspace(project.workspace_id, 'task:deleted', {
-      taskId,
-      projectId: project.id,
-      workspaceId: project.workspace_id,
-      actorId: userId,
-    });
+  await TaskQueries.delete(taskId);
+  await this.invalidateTaskCaches(project.workspace_id);
 
-    await TaskQueries.delete(taskId);
-    await this.invalidateTaskCaches(project.workspace_id);
+  // Invalidate my-tasks cache for both creator and assignee (if any)
+  await invalidateCache(
+    buildKey('mytasks', userId, '*'),
+    ...(task.assignee_user_id && task.assignee_user_id !== userId
+      ? [buildKey('mytasks', task.assignee_user_id, '*')]
+      : [])
+  );
 
-    if (data.assigneeId && data.assigneeId !== userId) {
-      await invalidateCache(buildKey('mytasks', data.assigneeId, '*'));
-    }
-
-    // Also invalidate the creator's
-    await invalidateCache(buildKey('mytasks', userId, '*'));
-
-    return true;
-  }
+  return true;
+}
 
   async archiveTask(taskId, userId) {
     const task = await TaskQueries.findById(taskId);
