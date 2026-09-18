@@ -8,7 +8,9 @@ dist/
 
 uploads/
 
-coverage/
-test-output.txt
+.env.test
+
 
 .env.test
+coverage/
+test-output.txt
