@@ -3,12 +3,6 @@
 ![CI](https://github.com/ankitraj-1602/TaskFlow/actions/workflows/ci.yml/badge.svg)
 ![Tests](https://img.shields.io/badge/tests-121%20passing-brightgreen)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
-
-# TaskFlow
-
-![CI](https://github.com/ankitraj-1602/TaskFlow/actions/workflows/ci.yml/badge.svg)
-![Tests](https://img.shields.io/badge/tests-121%20passing-brightgreen)
-![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 A production-style multi-tenant project management SaaS with authentication, RBAC, real-time collaboration, caching, background jobs, and CI/CD.
