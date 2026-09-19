@@ -1,11 +1,355 @@
+// const ProjectQueries = require('../db/queries/project.queries');
+// const WorkspaceQueries = require('../db/queries/workspace.queries');
+// const UserQueries = require('../db/queries/user.queries');
+// const { invalidateCache, buildKey } = require('../utils/cache.utils');
+
+// class ProjectService {
+//   async createProject(workspaceId, userId, data) {
+//     // Check if user has access to workspace
+//     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
+//     const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
+
+//     if (!isOwner && !userRole) {
+//       throw new Error('You do not have access to this workspace');
+//     }
+
+//     // Check if user can create projects (OWNER, ADMIN, MANAGER)
+//     if (!isOwner && !['ADMIN', 'MANAGER'].includes(userRole)) {
+//       throw new Error('You do not have permission to create projects');
+//     }
+
+//     const project = await ProjectQueries.create({
+//       name: data.name,
+//       description: data.description,
+//       workspaceId,
+//       createdById: userId,
+//       status: data.status || 'PLANNING',
+//       startDate: data.startDate,
+//       dueDate: data.dueDate,
+//     });
+
+//     // Add creator as project member
+//     const workspaceMember = await this.getWorkspaceMember(workspaceId, userId);
+//     if (workspaceMember) {
+//       await ProjectQueries.addMember(project.id, workspaceMember.id, 'OWNER');
+//     }
+
+//     await this.invalidateProjectCaches(workspaceId);
+//     return project;
+//   }
+
+//   async getProject(projectId, userId) {
+//     const project = await ProjectQueries.findById(projectId);
+//     if (!project) {
+//       throw new Error('Project not found');
+//     }
+
+//     // Check workspace access
+//     const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+//     if (!hasAccess) {
+//       throw new Error('You do not have access to this project');
+//     }
+
+//     const stats = await ProjectQueries.getStats(projectId);
+
+//     return {
+//       ...project,
+//       stats: {
+//         todo: parseInt(stats.todo_count),
+//         inProgress: parseInt(stats.in_progress_count),
+//         review: parseInt(stats.review_count),
+//         done: parseInt(stats.done_count),
+//         blocked: parseInt(stats.blocked_count),
+//         total: parseInt(stats.total_count),
+//         overdue: parseInt(stats.overdue_count),
+//       },
+//     };
+//   }
+
+//   async getWorkspaceProjects(workspaceId, userId, filters = {}) {
+//     // Check workspace access
+//     const hasAccess = await this.checkWorkspaceAccess(workspaceId, userId);
+//     if (!hasAccess) {
+//       throw new Error('You do not have access to this workspace');
+//     }
+
+//     return ProjectQueries.findByWorkspace(workspaceId, filters);
+//   }
+
+//   async updateProject(projectId, userId, data) {
+//     const project = await ProjectQueries.findById(projectId);
+//     if (!project) {
+//       throw new Error('Project not found');
+//     }
+
+//     // Check permissions
+//     const isOwner = project.owner_id === userId;
+//     const isCreator = project.created_by_id === userId;
+//     const workspaceRole = await WorkspaceQueries.getUserRole(project.workspace_id, userId);
+
+//     if (!isOwner && !isCreator && !['OWNER', 'ADMIN', 'MANAGER'].includes(workspaceRole)) {
+//       throw new Error('You do not have permission to update this project');
+//     }
+
+//     const updateData = {};
+//     if (data.name !== undefined) updateData.name = data.name;
+//     if (data.description !== undefined) updateData.description = data.description;
+//     if (data.status !== undefined) updateData.status = data.status;
+//     if (data.startDate !== undefined) updateData.start_date = data.startDate;
+//     if (data.dueDate !== undefined) updateData.due_date = data.dueDate;
+//     if (data.ownerId !== undefined) updateData.owner_id = data.ownerId;
+//     if (data.settings !== undefined) updateData.settings = data.settings;
+
+//     const updated = await ProjectQueries.update(projectId, updateData);
+
+//     // ⬇️ INVALIDATE
+//     await this.invalidateProjectCaches(project.workspace_id);
+
+//     return updated;
+//   }
+
+//   async deleteProject(projectId, userId) {
+//     const project = await ProjectQueries.findById(projectId);
+//     if (!project) {
+//       throw new Error('Project not found');
+//     }
+
+//     // Check permissions
+//     const isOwner = project.owner_id === userId;
+//     const isCreator = project.created_by_id === userId;
+//     const workspaceRole = await WorkspaceQueries.getUserRole(project.workspace_id, userId);
+
+//     if (!isOwner && !isCreator && workspaceRole !== 'OWNER') {
+//       throw new Error('You do not have permission to delete this project');
+//     }
+
+//     await ProjectQueries.delete(projectId);
+//     await this.invalidateProjectCaches(project.workspace_id);
+//     return true;
+//   }
+
+//   async archiveProject(projectId, userId) {
+//     const project = await ProjectQueries.findById(projectId);
+//     if (!project) {
+//       throw new Error('Project not found');
+//     }
+
+//     const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+//     if (!hasAccess) {
+//       throw new Error('You do not have permission');
+//     }
+
+//     const result = await ProjectQueries.archive(projectId);
+
+//     // ⬇️ INVALIDATE
+//     await this.invalidateProjectCaches(project.workspace_id);
+
+//     return result;
+//   }
+
+//   async unarchiveProject(projectId, userId) {
+//     const project = await ProjectQueries.findById(projectId);
+//     if (!project) {
+//       throw new Error('Project not found');
+//     }
+
+//     const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+//     if (!hasAccess) {
+//       throw new Error('You do not have permission');
+//     }
+
+//     const result = await ProjectQueries.unarchive(projectId);
+
+//     // ⬇️ INVALIDATE
+//     await this.invalidateProjectCaches(project.workspace_id);
+
+//     return result;
+//   }
+
+//   async getProjectMembers(projectId, userId) {
+//     const project = await ProjectQueries.findById(projectId);
+//     if (!project) {
+//       throw new Error('Project not found');
+//     }
+
+//     const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+//     if (!hasAccess) {
+//       throw new Error('You do not have access to this project');
+//     }
+
+//     return ProjectQueries.getMembers(projectId);
+//   }
+
+//   async addProjectMember(projectId, userId, memberData) {
+//     const { email, userId: memberUserId, role = 'MEMBER' } = memberData;
+
+//     const project = await ProjectQueries.findById(projectId);
+//     if (!project) {
+//       throw new Error('Project not found');
+//     }
+
+//     // Check permission
+//     const workspaceRole = await this.getWorkspaceRole(project.workspace_id, userId);
+//     const isProjectOwner = project.owner_id === userId;
+
+//     if (!isProjectOwner && !['OWNER', 'ADMIN', 'MANAGER'].includes(workspaceRole)) {
+//       throw new Error('You do not have permission to add project members');
+//     }
+
+//     // Find the target user — either by userId or email
+//     let targetUser;
+//     if (memberUserId) {
+//       targetUser = await UserQueries.findById(memberUserId);
+//     } else if (email) {
+//       targetUser = await UserQueries.findByEmail(email);
+//     } else {
+//       throw new Error('Either userId or email is required');
+//     }
+
+//     if (!targetUser) {
+//       throw new Error('User not found');
+//     }
+
+//     // Check if they're a workspace member (required to be a project member)
+//     const workspaceMember = await this.getWorkspaceMember(project.workspace_id, targetUser.id);
+//     if (!workspaceMember) {
+//       throw new Error('User must be a workspace member before being added to a project');
+//     }
+
+//     // Check if already a project member
+//     const isMember = await ProjectQueries.isMember(projectId, targetUser.id);
+//     if (isMember) {
+//       throw new Error('User is already a project member');
+//     }
+
+//     // Add member
+//     const member = await ProjectQueries.addMember(projectId, workspaceMember.id, role);
+
+//     await this.invalidateProjectCaches(project.workspace_id);
+
+//     return {
+//       ...member,
+//       user: {
+//         id: targetUser.id,
+//         name: targetUser.name,
+//         email: targetUser.email,
+//         profile_picture: targetUser.profile_picture,
+//       },
+//     };
+//   }
+
+//   async removeProjectMember(projectId, userId, memberId) {
+//     const project = await ProjectQueries.findById(projectId);
+//     if (!project) {
+//       throw new Error('Project not found');
+//     }
+
+//     // Check permission
+//     const workspaceRole = await this.getWorkspaceRole(project.workspace_id, userId);
+//     const isProjectOwner = project.owner_id === userId;
+
+//     if (!isProjectOwner && !['OWNER', 'ADMIN', 'MANAGER'].includes(workspaceRole)) {
+//       throw new Error('You do not have permission to remove project members');
+//     }
+
+//     // Find the member
+//     const member = await ProjectQueries.findMemberById(projectId, memberId);
+//     if (!member) {
+//       throw new Error('Project member not found');
+//     }
+
+//     // Cannot remove project creator
+//     if (member.user_id === project.created_by_id) {
+//       throw new Error('Cannot remove project creator');
+//     }
+
+//     // Cannot remove project owner
+//     if (member.user_id === project.owner_id) {
+//       throw new Error('Cannot remove project owner');
+//     }
+
+//     await ProjectQueries.removeMemberById(projectId, memberId);
+//     await this.invalidateProjectCaches(project.workspace_id);
+//     return true;
+//   }
+
+//   // Helper to get workspace role
+//  async getWorkspaceRole(workspaceId, userId) {
+//   const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+//   if (access.isOwner) return 'OWNER';
+//   return access.role;
+// }
+
+//   // Helper methods
+//   async getWorkspaceMember(workspaceId, userId) {
+//     const WorkspaceQueries = require('../db/queries/workspace.queries');
+//     const members = await WorkspaceQueries.getMembers(workspaceId);
+//     return members.find(m => m.user_id === userId);
+//   }
+
+// async checkWorkspaceAccess(workspaceId, userId) {
+//   const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+//   return access.isOwner || access.isMember;
+// }
+
+//   async invalidateProjectCaches(workspaceId) {
+//     await invalidateCache(buildKey('dashboard', '*', workspaceId));
+//   }
+
+//   async getAvailableMembers(projectId, userId) {
+//     const project = await ProjectQueries.findById(projectId);
+//     if (!project) {
+//       throw new Error('Project not found');
+//     }
+
+//     // Check access
+//     const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+//     if (!hasAccess) {
+//       throw new Error('You do not have access to this project');
+//     }
+
+//     // Get all workspace members
+//     const WorkspaceQueries = require('../db/queries/workspace.queries');
+//     const workspaceMembers = await WorkspaceQueries.getMembers(project.workspace_id);
+
+//     // Get existing project members
+//     const projectMembers = await ProjectQueries.getMembers(projectId);
+//     const projectMemberUserIds = new Set(projectMembers.map(m => m.user_id));
+
+//     // Filter out those already in the project
+//     return workspaceMembers.filter(m => !projectMemberUserIds.has(m.user_id));
+//   }
+//   async getAllMyProjects(userId) {
+//     const rows = await ProjectQueries.findAllForUser(userId);
+//     return rows.map((row) => ({
+//       id: row.id,
+//       name: row.name,
+//       description: row.description,
+//       status: row.status,
+//       startDate: row.start_date,
+//       dueDate: row.due_date,
+//       workspaceId: row.workspace_id,
+//       workspaceName: row.workspace_name,
+//       taskCount: parseInt(row.task_count || 0),
+//       completedTaskCount: parseInt(row.completed_task_count || 0),
+//       memberCount: parseInt(row.member_count || 0),
+//       ownerName: row.owner_name,
+//       createdAt: row.created_at,
+//     }));
+//   }
+// }
+
+// module.exports = ProjectService;
+
+
 const ProjectQueries = require('../db/queries/project.queries');
 const WorkspaceQueries = require('../db/queries/workspace.queries');
 const UserQueries = require('../db/queries/user.queries');
 const { invalidateCache, buildKey } = require('../utils/cache.utils');
+const logger = require('../config/logger');
 
 class ProjectService {
   async createProject(workspaceId, userId, data) {
-    // Check if user has access to workspace
     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
     const userRole = await WorkspaceQueries.getUserRole(workspaceId, userId);
 
@@ -13,7 +357,6 @@ class ProjectService {
       throw new Error('You do not have access to this workspace');
     }
 
-    // Check if user can create projects (OWNER, ADMIN, MANAGER)
     if (!isOwner && !['ADMIN', 'MANAGER'].includes(userRole)) {
       throw new Error('You do not have permission to create projects');
     }
@@ -28,13 +371,22 @@ class ProjectService {
       dueDate: data.dueDate,
     });
 
-    // Add creator as project member
     const workspaceMember = await this.getWorkspaceMember(workspaceId, userId);
     if (workspaceMember) {
       await ProjectQueries.addMember(project.id, workspaceMember.id, 'OWNER');
     }
 
     await this.invalidateProjectCaches(workspaceId);
+
+    // ✅ Success log
+    logger.info('Project created', {
+      projectId: project.id,
+      workspaceId,
+      userId,
+      name: data.name,
+      status: project.status,
+    });
+
     return project;
   }
 
@@ -44,7 +396,6 @@ class ProjectService {
       throw new Error('Project not found');
     }
 
-    // Check workspace access
     const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
     if (!hasAccess) {
       throw new Error('You do not have access to this project');
@@ -67,7 +418,6 @@ class ProjectService {
   }
 
   async getWorkspaceProjects(workspaceId, userId, filters = {}) {
-    // Check workspace access
     const hasAccess = await this.checkWorkspaceAccess(workspaceId, userId);
     if (!hasAccess) {
       throw new Error('You do not have access to this workspace');
@@ -82,7 +432,6 @@ class ProjectService {
       throw new Error('Project not found');
     }
 
-    // Check permissions
     const isOwner = project.owner_id === userId;
     const isCreator = project.created_by_id === userId;
     const workspaceRole = await WorkspaceQueries.getUserRole(project.workspace_id, userId);
@@ -102,8 +451,15 @@ class ProjectService {
 
     const updated = await ProjectQueries.update(projectId, updateData);
 
-    // ⬇️ INVALIDATE
     await this.invalidateProjectCaches(project.workspace_id);
+
+    // ✅ Success log
+    logger.info('Project updated', {
+      projectId,
+      workspaceId: project.workspace_id,
+      userId,
+      changes: Object.keys(updateData),
+    });
 
     return updated;
   }
@@ -114,7 +470,6 @@ class ProjectService {
       throw new Error('Project not found');
     }
 
-    // Check permissions
     const isOwner = project.owner_id === userId;
     const isCreator = project.created_by_id === userId;
     const workspaceRole = await WorkspaceQueries.getUserRole(project.workspace_id, userId);
@@ -125,6 +480,15 @@ class ProjectService {
 
     await ProjectQueries.delete(projectId);
     await this.invalidateProjectCaches(project.workspace_id);
+
+    // ✅ Success log — destructive action
+    logger.info('Project deleted', {
+      projectId,
+      workspaceId: project.workspace_id,
+      userId,
+      name: project.name,
+    });
+
     return true;
   }
 
@@ -141,8 +505,14 @@ class ProjectService {
 
     const result = await ProjectQueries.archive(projectId);
 
-    // ⬇️ INVALIDATE
     await this.invalidateProjectCaches(project.workspace_id);
+
+    // ✅ Success log
+    logger.info('Project archived', {
+      projectId,
+      workspaceId: project.workspace_id,
+      userId,
+    });
 
     return result;
   }
@@ -160,8 +530,14 @@ class ProjectService {
 
     const result = await ProjectQueries.unarchive(projectId);
 
-    // ⬇️ INVALIDATE
     await this.invalidateProjectCaches(project.workspace_id);
+
+    // ✅ Success log
+    logger.info('Project unarchived', {
+      projectId,
+      workspaceId: project.workspace_id,
+      userId,
+    });
 
     return result;
   }
@@ -188,7 +564,6 @@ class ProjectService {
       throw new Error('Project not found');
     }
 
-    // Check permission
     const workspaceRole = await this.getWorkspaceRole(project.workspace_id, userId);
     const isProjectOwner = project.owner_id === userId;
 
@@ -196,7 +571,6 @@ class ProjectService {
       throw new Error('You do not have permission to add project members');
     }
 
-    // Find the target user — either by userId or email
     let targetUser;
     if (memberUserId) {
       targetUser = await UserQueries.findById(memberUserId);
@@ -210,22 +584,28 @@ class ProjectService {
       throw new Error('User not found');
     }
 
-    // Check if they're a workspace member (required to be a project member)
     const workspaceMember = await this.getWorkspaceMember(project.workspace_id, targetUser.id);
     if (!workspaceMember) {
       throw new Error('User must be a workspace member before being added to a project');
     }
 
-    // Check if already a project member
     const isMember = await ProjectQueries.isMember(projectId, targetUser.id);
     if (isMember) {
       throw new Error('User is already a project member');
     }
 
-    // Add member
     const member = await ProjectQueries.addMember(projectId, workspaceMember.id, role);
 
     await this.invalidateProjectCaches(project.workspace_id);
+
+    // ✅ Success log
+    logger.info('Project member added', {
+      projectId,
+      workspaceId: project.workspace_id,
+      addedUserId: targetUser.id,
+      addedByUserId: userId,
+      role,
+    });
 
     return {
       ...member,
@@ -244,7 +624,6 @@ class ProjectService {
       throw new Error('Project not found');
     }
 
-    // Check permission
     const workspaceRole = await this.getWorkspaceRole(project.workspace_id, userId);
     const isProjectOwner = project.owner_id === userId;
 
@@ -252,33 +631,39 @@ class ProjectService {
       throw new Error('You do not have permission to remove project members');
     }
 
-    // Find the member
     const member = await ProjectQueries.findMemberById(projectId, memberId);
     if (!member) {
       throw new Error('Project member not found');
     }
 
-    // Cannot remove project creator
     if (member.user_id === project.created_by_id) {
       throw new Error('Cannot remove project creator');
     }
 
-    // Cannot remove project owner
     if (member.user_id === project.owner_id) {
       throw new Error('Cannot remove project owner');
     }
 
     await ProjectQueries.removeMemberById(projectId, memberId);
     await this.invalidateProjectCaches(project.workspace_id);
+
+    // ✅ Success log
+    logger.info('Project member removed', {
+      projectId,
+      workspaceId: project.workspace_id,
+      removedUserId: member.user_id,
+      removedByUserId: userId,
+    });
+
     return true;
   }
 
   // Helper to get workspace role
- async getWorkspaceRole(workspaceId, userId) {
-  const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
-  if (access.isOwner) return 'OWNER';
-  return access.role;
-}
+  async getWorkspaceRole(workspaceId, userId) {
+    const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+    if (access.isOwner) return 'OWNER';
+    return access.role;
+  }
 
   // Helper methods
   async getWorkspaceMember(workspaceId, userId) {
@@ -287,10 +672,10 @@ class ProjectService {
     return members.find(m => m.user_id === userId);
   }
 
-async checkWorkspaceAccess(workspaceId, userId) {
-  const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
-  return access.isOwner || access.isMember;
-}
+  async checkWorkspaceAccess(workspaceId, userId) {
+    const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+    return access.isOwner || access.isMember;
+  }
 
   async invalidateProjectCaches(workspaceId) {
     await invalidateCache(buildKey('dashboard', '*', workspaceId));
@@ -302,23 +687,20 @@ async checkWorkspaceAccess(workspaceId, userId) {
       throw new Error('Project not found');
     }
 
-    // Check access
     const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
     if (!hasAccess) {
       throw new Error('You do not have access to this project');
     }
 
-    // Get all workspace members
     const WorkspaceQueries = require('../db/queries/workspace.queries');
     const workspaceMembers = await WorkspaceQueries.getMembers(project.workspace_id);
 
-    // Get existing project members
     const projectMembers = await ProjectQueries.getMembers(projectId);
     const projectMemberUserIds = new Set(projectMembers.map(m => m.user_id));
 
-    // Filter out those already in the project
     return workspaceMembers.filter(m => !projectMemberUserIds.has(m.user_id));
   }
+
   async getAllMyProjects(userId) {
     const rows = await ProjectQueries.findAllForUser(userId);
     return rows.map((row) => ({

@@ -39,7 +39,9 @@ app.use(cors({
   maxAge: 86400,
 }));
 app.use(compression());
-app.use(morgan('dev'));
+// app.use(morgan('dev'));
+const { requestLogger } = require('./middleware/logger.middleware');
+app.use(requestLogger);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
