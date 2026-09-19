@@ -27,6 +27,7 @@ const AttachmentController = require('./controllers/attachment.controller');
 const { isRedisReady } = require('./config/redis');
 const pool = require('./config/database');
 const queueDashboard = require('./config/queueDashboard');
+const logger = require('./config/logger');
 
 const app = express();
 
@@ -118,12 +119,29 @@ app.use((req, res) => {
 
 // ─── Error handler (must be LAST) ──────────────────
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
   const status = err.status || 500;
-  const message = err.message || 'Internal Server Error';
+
+  // Log full error with request context
+  logger.error('Unhandled error', {
+    correlationId: req.correlationId,
+    message: err.message,
+    stack: err.stack,
+    method: req.method,
+    url: req.originalUrl,
+    userId: req.user?.userId,
+    statusCode: status,
+  });
+
+  // Don't leak internal errors in production
+  const message =
+    process.env.NODE_ENV === 'production' && status === 500
+      ? 'Internal server error'
+      : err.message || 'Internal Server Error';
+
   res.status(status).json({
     success: false,
     message,
+    correlationId: req.correlationId,   // ⬅️ NEW — helps users report issues
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
     timestamp: new Date().toISOString(),
   });
