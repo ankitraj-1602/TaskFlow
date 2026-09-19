@@ -1,4 +1,5 @@
 const winston = require('winston');
+const DailyRotateFile = require('winston-daily-rotate-file');   // ⬅️ ADD THIS
 const path = require('path');
 const fs = require('fs');
 

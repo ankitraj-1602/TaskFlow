@@ -1,3 +1,279 @@
+// // const CommentQueries = require('../db/queries/comment.queries');
+// // const MentionQueries = require('../db/queries/mention.queries');
+// // const TaskQueries = require('../db/queries/task.queries');
+// // const ProjectQueries = require('../db/queries/project.queries');
+// // const WorkspaceQueries = require('../db/queries/workspace.queries');
+// // const UserQueries = require('../db/queries/user.queries');
+// // const ActivityService = require('./activity.service');
+// // const activityService = new ActivityService();
+// // const NotificationService = require('./notification.service');
+// // const notificationService = new NotificationService();
+// // const { emitToWorkspace } = require('../config/socket');
+// // const { invalidateCache, buildKey } = require('../utils/cache.utils');
+
+// // class CommentService {
+// //   /**
+// //    * Extract @mentions from comment content.
+// //    * Format: @email
+// //    */
+// //   extractMentionEmails(content) {
+// //     const regex = /@([\w.+-]+@[\w-]+\.[\w.-]+)/g;
+// //     const matches = [];
+// //     let match;
+// //     while ((match = regex.exec(content)) !== null) {
+// //       matches.push(match[1]);
+// //     }
+// //     return [...new Set(matches)];
+// //   }
+
+// //   /**
+// //    * Resolve mentioned emails to user IDs — only workspace members.
+// //    */
+// //   async resolveMentionsToUserIds(emails, workspaceId) {
+// //     if (emails.length === 0) return [];
+
+// //     const members = await WorkspaceQueries.getMembers(workspaceId);
+// //     const memberEmails = new Set(members.map((m) => m.email.toLowerCase()));
+
+// //     const userIds = [];
+// //     for (const email of emails) {
+// //       if (memberEmails.has(email.toLowerCase())) {
+// //         const user = await UserQueries.findByEmail(email);
+// //         if (user) userIds.push(user.id);
+// //       }
+// //     }
+// //     return userIds;
+// //   }
+
+// //   async createComment(taskId, userId, data) {
+// //     const task = await TaskQueries.findById(taskId);
+// //     if (!task) throw new Error('Task not found');
+
+// //     const project = await ProjectQueries.findById(task.project_id);
+// //     const hasAccess = await this.checkWorkspaceAccess(
+// //       project.workspace_id,
+// //       userId
+// //     );
+// //     if (!hasAccess) throw new Error('You do not have access to this task');
+
+// //     // Validate parent comment
+// //     if (data.parentId) {
+// //       const parent = await CommentQueries.findById(data.parentId);
+// //       if (!parent || parent.task_id !== taskId) {
+// //         throw new Error('Parent comment not found');
+// //       }
+// //     }
+
+// //     // Create
+// //     const created = await CommentQueries.create({
+// //       content: data.content,
+// //       taskId,
+// //       authorId: userId,
+// //       parentId: data.parentId,
+// //     });
+
+
+// //     // Save mentions
+// //     const emails = this.extractMentionEmails(data.content);
+// //     const mentionedUserIds = await this.resolveMentionsToUserIds(
+// //       emails,
+// //       project.workspace_id
+// //     );
+// //     if (mentionedUserIds.length > 0) {
+// //       await MentionQueries.createMany(created.id, mentionedUserIds);
+// //     }
+
+
+// //     await activityService.log({
+// //       action: 'COMMENTED',
+// //       userId,
+// //       workspaceId: project.workspace_id,
+// //       projectId: project.id,
+// //       taskId,
+// //       commentId: created.id,
+// //     });
+
+// //     // If there are mentions, log them too
+// //     if (mentionedUserIds.length > 0) {
+// //       await activityService.log({
+// //         action: 'MENTIONED',
+// //         userId,
+// //         workspaceId: project.workspace_id,
+// //         projectId: project.id,
+// //         taskId,
+// //         commentId: created.id,
+// //         changes: { mentionedCount: mentionedUserIds.length },
+// //       });
+// //     }
+
+
+// //     // Notify mentioned users
+// //     for (const mentionedUserId of mentionedUserIds) {
+// //       await notificationService.notifyMention({
+// //         userId: mentionedUserId,
+// //         actorId: userId,
+// //         taskId,
+// //         taskTitle: task.title,
+// //         commentId: created.id,
+// //         projectId: project.id,
+// //       });
+// //     }
+
+// //     // Notify task assignee (if not the commenter and not already mentioned)
+// //     const taskFull = await TaskQueries.findById(taskId);
+// //     const members = await WorkspaceQueries.getMembers(project.workspace_id);
+// //     const assignee = members.find((m) => m.id === taskFull.assignee_id);
+
+// //     if (
+// //       assignee &&
+// //       assignee.user_id !== userId &&
+// //       !mentionedUserIds.includes(assignee.user_id)
+// //     ) {
+// //       await notificationService.notifyComment({
+// //         userId: assignee.user_id,
+// //         actorId: userId,
+// //         taskId,
+// //         taskTitle: task.title,
+// //         commentId: created.id,
+// //         projectId: project.id,
+// //       });
+
+// //       // Re-fetch with author joins so the frontend gets full data
+// //     }
+// //     const fullComment = await CommentQueries.findById(created.id);
+// //     emitToWorkspace(project.workspace_id, 'comment:created', {
+// //       comment: this.enrichCommentTree(fullComment),
+// //       taskId,
+// //       projectId: project.id,
+// //       workspaceId: project.workspace_id,
+// //       actorId: userId,
+// //     });
+
+// //     await this.invalidateCommentCaches(project.workspace_id);
+// //     return this.enrichCommentTree(fullComment);
+// //   }
+
+// //   async getTaskComments(taskId, userId) {
+// //     const task = await TaskQueries.findById(taskId);
+// //     if (!task) throw new Error('Task not found');
+
+// //     const project = await ProjectQueries.findById(task.project_id);
+// //     const hasAccess = await this.checkWorkspaceAccess(
+// //       project.workspace_id,
+// //       userId
+// //     );
+// //     if (!hasAccess) throw new Error('You do not have access to this task');
+
+// //     const comments = await CommentQueries.findByTask(taskId);
+// //     return comments.map((c) => this.enrichCommentTree(c));
+// //   }
+
+// //   async updateComment(commentId, userId, content) {
+// //     const comment = await CommentQueries.findById(commentId);
+// //     if (!comment) throw new Error('Comment not found');
+
+// //     if (comment.author_id !== userId) {
+// //       throw new Error('You can only edit your own comments');
+// //     }
+
+// //     await CommentQueries.update(commentId, content);
+
+// //     // Re-sync mentions
+// //     await MentionQueries.deleteByComment(commentId);
+// //     const task = await TaskQueries.findById(comment.task_id);
+// //     const project = await ProjectQueries.findById(task.project_id);
+// //     const emails = this.extractMentionEmails(content);
+// //     const mentionedUserIds = await this.resolveMentionsToUserIds(
+// //       emails,
+// //       project.workspace_id
+// //     );
+// //     if (mentionedUserIds.length > 0) {
+// //       await MentionQueries.createMany(commentId, mentionedUserIds);
+// //     }
+
+// //     // Re-fetch with author joins
+// //     const fullComment = await CommentQueries.findById(commentId);
+// //     emitToWorkspace(project.workspace_id, 'comment:updated', {
+// //       comment: this.enrichCommentTree(fullComment),
+// //       taskId: comment.task_id,
+// //       projectId: project.id,
+// //       workspaceId: project.workspace_id,
+// //       actorId: userId,
+// //     });
+
+// //     await this.invalidateCommentCaches(project.workspace_id);
+// //     return this.enrichCommentTree(fullComment);
+// //   }
+
+// //   async deleteComment(commentId, userId) {
+// //     const comment = await CommentQueries.findById(commentId);
+// //     if (!comment) throw new Error('Comment not found');
+
+// //     const task = await TaskQueries.findById(comment.task_id);
+// //     const project = await ProjectQueries.findById(task.project_id);
+// //     const workspaceRole = await this.getWorkspaceRole(
+// //       project.workspace_id,
+// //       userId
+// //     );
+
+// //     const isAuthor = comment.author_id === userId;
+// //     const isManager = ['OWNER', 'ADMIN', 'MANAGER'].includes(workspaceRole);
+
+// //     if (!isAuthor && !isManager) {
+// //       throw new Error('You do not have permission to delete this comment');
+// //     }
+
+// //     await CommentQueries.delete(commentId);
+// //     emitToWorkspace(project.workspace_id, 'comment:deleted', {
+// //       commentId,
+// //       taskId: comment.task_id,
+// //       projectId: project.id,
+// //       workspaceId: project.workspace_id,
+// //       actorId: userId,
+// //     });
+
+// //     await this.invalidateCommentCaches(project.workspace_id);
+// //     return true;
+// //   }
+
+// //   // ─── Helpers ───────────────────────────────────────
+// //   enrichCommentTree(comment) {
+// //     if (!comment) return null;
+// //     return {
+// //       id: comment.id,
+// //       content: comment.content,
+// //       taskId: comment.task_id,
+// //       authorId: comment.author_id,
+// //       authorName: comment.author_name,
+// //       authorEmail: comment.author_email,
+// //       authorPicture: comment.author_picture,
+// //       parentId: comment.parent_id,
+// //       isEdited: comment.is_edited,
+// //       editedAt: comment.edited_at,
+// //       createdAt: comment.created_at,
+// //       updatedAt: comment.updated_at,
+// //       replies: (comment.replies || []).map((r) => this.enrichCommentTree(r)),
+// //     };
+// //   }
+
+// // async checkWorkspaceAccess(workspaceId, userId) {
+// //   const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+// //   return access.isOwner || access.isMember;
+// // }
+
+// //   async invalidateCommentCaches(workspaceId) {
+// //     await invalidateCache(buildKey('dashboard', '*', workspaceId));
+// //   }
+
+// //   async getWorkspaceRole(workspaceId, userId) {
+// //     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
+// //     if (isOwner) return 'OWNER';
+// //     return WorkspaceQueries.getUserRole(workspaceId, userId);
+// //   }
+// // }
+
+// // module.exports = CommentService;
+
 // const CommentQueries = require('../db/queries/comment.queries');
 // const MentionQueries = require('../db/queries/mention.queries');
 // const TaskQueries = require('../db/queries/task.queries');
@@ -28,21 +304,19 @@
 
 //   /**
 //    * Resolve mentioned emails to user IDs — only workspace members.
+//    * Uses cached member list — no per-email DB query.
 //    */
 //   async resolveMentionsToUserIds(emails, workspaceId) {
 //     if (emails.length === 0) return [];
 
 //     const members = await WorkspaceQueries.getMembers(workspaceId);
-//     const memberEmails = new Set(members.map((m) => m.email.toLowerCase()));
+//     const memberEmailToId = new Map(
+//       members.map((m) => [m.email.toLowerCase(), m.user_id])
+//     );
 
-//     const userIds = [];
-//     for (const email of emails) {
-//       if (memberEmails.has(email.toLowerCase())) {
-//         const user = await UserQueries.findByEmail(email);
-//         if (user) userIds.push(user.id);
-//       }
-//     }
-//     return userIds;
+//     return emails
+//       .map((email) => memberEmailToId.get(email.toLowerCase()))
+//       .filter(Boolean);
 //   }
 
 //   async createComment(taskId, userId, data) {
@@ -72,7 +346,6 @@
 //       parentId: data.parentId,
 //     });
 
-
 //     // Save mentions
 //     const emails = this.extractMentionEmails(data.content);
 //     const mentionedUserIds = await this.resolveMentionsToUserIds(
@@ -83,7 +356,6 @@
 //       await MentionQueries.createMany(created.id, mentionedUserIds);
 //     }
 
-
 //     await activityService.log({
 //       action: 'COMMENTED',
 //       userId,
@@ -93,7 +365,6 @@
 //       commentId: created.id,
 //     });
 
-//     // If there are mentions, log them too
 //     if (mentionedUserIds.length > 0) {
 //       await activityService.log({
 //         action: 'MENTIONED',
@@ -106,7 +377,6 @@
 //       });
 //     }
 
-
 //     // Notify mentioned users
 //     for (const mentionedUserId of mentionedUserIds) {
 //       await notificationService.notifyMention({
@@ -116,13 +386,17 @@
 //         taskTitle: task.title,
 //         commentId: created.id,
 //         projectId: project.id,
+//         workspaceId: project.workspace_id,   // ⬅️ FIXED
 //       });
 //     }
 
 //     // Notify task assignee (if not the commenter and not already mentioned)
-//     const taskFull = await TaskQueries.findById(taskId);
-//     const members = await WorkspaceQueries.getMembers(project.workspace_id);
-//     const assignee = members.find((m) => m.id === taskFull.assignee_id);
+//     const assignee = task.assignee_id
+//       ? await WorkspaceQueries.findMemberById(
+//           project.workspace_id,
+//           task.assignee_id
+//         )
+//       : null;
 
 //     if (
 //       assignee &&
@@ -136,10 +410,11 @@
 //         taskTitle: task.title,
 //         commentId: created.id,
 //         projectId: project.id,
+//         workspaceId: project.workspace_id,   // ⬅️ FIXED
 //       });
-
-//       // Re-fetch with author joins so the frontend gets full data
 //     }
+
+//     // Re-fetch with author joins so the frontend gets full data
 //     const fullComment = await CommentQueries.findById(created.id);
 //     emitToWorkspace(project.workspace_id, 'comment:created', {
 //       comment: this.enrichCommentTree(fullComment),
@@ -256,23 +531,24 @@
 //     };
 //   }
 
-// async checkWorkspaceAccess(workspaceId, userId) {
-//   const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
-//   return access.isOwner || access.isMember;
-// }
+//   async checkWorkspaceAccess(workspaceId, userId) {
+//     const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+//     return access.isOwner || access.isMember;
+//   }
 
 //   async invalidateCommentCaches(workspaceId) {
 //     await invalidateCache(buildKey('dashboard', '*', workspaceId));
 //   }
 
 //   async getWorkspaceRole(workspaceId, userId) {
-//     const isOwner = await WorkspaceQueries.isOwner(workspaceId, userId);
-//     if (isOwner) return 'OWNER';
-//     return WorkspaceQueries.getUserRole(workspaceId, userId);
+//     const access = await WorkspaceQueries.getWorkspaceAccess(workspaceId, userId);
+//     if (access.isOwner) return 'OWNER';
+//     return access.role;
 //   }
 // }
 
 // module.exports = CommentService;
+
 
 const CommentQueries = require('../db/queries/comment.queries');
 const MentionQueries = require('../db/queries/mention.queries');
@@ -286,6 +562,7 @@ const NotificationService = require('./notification.service');
 const notificationService = new NotificationService();
 const { emitToWorkspace } = require('../config/socket');
 const { invalidateCache, buildKey } = require('../utils/cache.utils');
+const logger = require('../config/logger');
 
 class CommentService {
   /**
@@ -304,7 +581,6 @@ class CommentService {
 
   /**
    * Resolve mentioned emails to user IDs — only workspace members.
-   * Uses cached member list — no per-email DB query.
    */
   async resolveMentionsToUserIds(emails, workspaceId) {
     if (emails.length === 0) return [];
@@ -379,15 +655,24 @@ class CommentService {
 
     // Notify mentioned users
     for (const mentionedUserId of mentionedUserIds) {
-      await notificationService.notifyMention({
-        userId: mentionedUserId,
-        actorId: userId,
-        taskId,
-        taskTitle: task.title,
-        commentId: created.id,
-        projectId: project.id,
-        workspaceId: project.workspace_id,   // ⬅️ FIXED
-      });
+      try {
+        await notificationService.notifyMention({
+          userId: mentionedUserId,
+          actorId: userId,
+          taskId,
+          taskTitle: task.title,
+          commentId: created.id,
+          projectId: project.id,
+          workspaceId: project.workspace_id,
+        });
+      } catch (notifError) {
+        // ⚠️ Non-fatal — comment is created, just notification failed
+        logger.warn('Failed to notify mentioned user', {
+          commentId: created.id,
+          mentionedUserId,
+          error: notifError.message,
+        });
+      }
     }
 
     // Notify task assignee (if not the commenter and not already mentioned)
@@ -403,28 +688,56 @@ class CommentService {
       assignee.user_id !== userId &&
       !mentionedUserIds.includes(assignee.user_id)
     ) {
-      await notificationService.notifyComment({
-        userId: assignee.user_id,
-        actorId: userId,
-        taskId,
-        taskTitle: task.title,
-        commentId: created.id,
-        projectId: project.id,
-        workspaceId: project.workspace_id,   // ⬅️ FIXED
-      });
+      try {
+        await notificationService.notifyComment({
+          userId: assignee.user_id,
+          actorId: userId,
+          taskId,
+          taskTitle: task.title,
+          commentId: created.id,
+          projectId: project.id,
+          workspaceId: project.workspace_id,
+        });
+      } catch (notifError) {
+        logger.warn('Failed to notify task assignee', {
+          commentId: created.id,
+          assigneeUserId: assignee.user_id,
+          error: notifError.message,
+        });
+      }
     }
 
     // Re-fetch with author joins so the frontend gets full data
     const fullComment = await CommentQueries.findById(created.id);
-    emitToWorkspace(project.workspace_id, 'comment:created', {
-      comment: this.enrichCommentTree(fullComment),
+
+    try {
+      emitToWorkspace(project.workspace_id, 'comment:created', {
+        comment: this.enrichCommentTree(fullComment),
+        taskId,
+        projectId: project.id,
+        workspaceId: project.workspace_id,
+        actorId: userId,
+      });
+    } catch (socketError) {
+      logger.warn('Failed to emit comment:created', {
+        commentId: created.id,
+        error: socketError.message,
+      });
+    }
+
+    await this.invalidateCommentCaches(project.workspace_id);
+
+    // ✅ Success log
+    logger.info('Comment created', {
+      commentId: created.id,
       taskId,
       projectId: project.id,
       workspaceId: project.workspace_id,
-      actorId: userId,
+      userId,
+      parentId: data.parentId || null,
+      mentionCount: mentionedUserIds.length,
     });
 
-    await this.invalidateCommentCaches(project.workspace_id);
     return this.enrichCommentTree(fullComment);
   }
 
@@ -468,15 +781,33 @@ class CommentService {
 
     // Re-fetch with author joins
     const fullComment = await CommentQueries.findById(commentId);
-    emitToWorkspace(project.workspace_id, 'comment:updated', {
-      comment: this.enrichCommentTree(fullComment),
+
+    try {
+      emitToWorkspace(project.workspace_id, 'comment:updated', {
+        comment: this.enrichCommentTree(fullComment),
+        taskId: comment.task_id,
+        projectId: project.id,
+        workspaceId: project.workspace_id,
+        actorId: userId,
+      });
+    } catch (socketError) {
+      logger.warn('Failed to emit comment:updated', {
+        commentId,
+        error: socketError.message,
+      });
+    }
+
+    await this.invalidateCommentCaches(project.workspace_id);
+
+    // ✅ Success log
+    logger.info('Comment updated', {
+      commentId,
       taskId: comment.task_id,
       projectId: project.id,
       workspaceId: project.workspace_id,
-      actorId: userId,
+      userId,
     });
 
-    await this.invalidateCommentCaches(project.workspace_id);
     return this.enrichCommentTree(fullComment);
   }
 
@@ -499,15 +830,35 @@ class CommentService {
     }
 
     await CommentQueries.delete(commentId);
-    emitToWorkspace(project.workspace_id, 'comment:deleted', {
+
+    try {
+      emitToWorkspace(project.workspace_id, 'comment:deleted', {
+        commentId,
+        taskId: comment.task_id,
+        projectId: project.id,
+        workspaceId: project.workspace_id,
+        actorId: userId,
+      });
+    } catch (socketError) {
+      logger.warn('Failed to emit comment:deleted', {
+        commentId,
+        error: socketError.message,
+      });
+    }
+
+    await this.invalidateCommentCaches(project.workspace_id);
+
+    // ✅ Success log — include whether this was self-delete or mod action
+    logger.info('Comment deleted', {
       commentId,
       taskId: comment.task_id,
       projectId: project.id,
       workspaceId: project.workspace_id,
-      actorId: userId,
+      userId,
+      deletedByAuthor: isAuthor,
+      deletedByManager: !isAuthor && isManager,
     });
 
-    await this.invalidateCommentCaches(project.workspace_id);
     return true;
   }
 

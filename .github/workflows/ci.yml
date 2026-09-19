@@ -67,6 +67,7 @@ jobs:
       EMAIL_VERIFICATION_EXPIRY_HOURS: 24
       PASSWORD_RESET_EXPIRY_HOURS: 1
       UPLOAD_DIR: ./uploads-test
+      LOG_LEVEL: error
 
     # ─── Steps ─────────────────────────────────────────────
     steps:
