@@ -32,8 +32,8 @@ COPY --chown=nodejs:nodejs docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create uploads folder
-RUN mkdir -p /app/uploads && chown -R nodejs:nodejs /app/uploads
-
+RUN mkdir -p /app/uploads /app/logs && \
+    chown -R nodejs:nodejs /app/uploads /app/logs
 USER nodejs
 
 EXPOSE 5000
