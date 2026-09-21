@@ -7,6 +7,8 @@ import { EmptyState } from '../components/UI/EmptyState';
 import { TaskDetailModal } from '../components/Task/TaskDetailModal';
 import { Button } from '../components/Forms/Button';
 import { useTaskStore } from '../store/task.store';
+import { taskApi } from '../api/task.api';
+import { LabelBadge } from '../components/Label/LabelBadge';
 import { CalendarIcon } from '@heroicons/react/24/outline';
 
 export const MyTasks = () => {
@@ -29,6 +31,27 @@ export const MyTasks = () => {
   useEffect(() => {
     setPage(1);
   }, [statusFilter]);
+
+  // ─── Listen for task-updated events (from LabelPicker) ───
+  useEffect(() => {
+    const handler = async (e) => {
+      if (!selectedTask || e.detail?.taskId !== selectedTask.id) return;
+      try {
+        const fresh = await taskApi.getById(selectedTask.id);
+        setSelectedTask(fresh);
+        // Update the row in the list so labels appear without refresh
+        useTaskStore.getState().updateTaskInList(fresh.id, {
+          labels: fresh.labels,
+        });
+      } catch (err) {
+        // Silent
+      }
+    };
+
+    window.addEventListener('task-updated', handler);
+    return () => window.removeEventListener('task-updated', handler);
+  }, [selectedTask?.id]);
+  // ──────────────────────────────────────────────────────────
 
   const handleTaskClick = (task) => {
     setSelectedTask(task);
@@ -102,8 +125,27 @@ export const MyTasks = () => {
                           <StatusBadge status={task.status} size="sm" />
                           <PriorityBadge priority={task.priority} size="sm" />
                         </div>
+
+                        {/* ⬇️ Labels on My Tasks row */}
+                        {task.labels && task.labels.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {task.labels.slice(0, 3).map((label) => (
+                              <LabelBadge
+                                key={label.id}
+                                label={label}
+                                size="xs"
+                              />
+                            ))}
+                            {task.labels.length > 3 && (
+                              <span className="text-[10px] text-gray-500 self-center">
+                                +{task.labels.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
                         {task.projectName && (
-                          <p className="text-xs text-gray-500 font-medium">
+                          <p className="text-xs text-gray-500 font-medium mt-1.5">
                             {task.projectName}
                           </p>
                         )}

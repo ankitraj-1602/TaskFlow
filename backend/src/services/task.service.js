@@ -1199,6 +1199,7 @@ const notificationService = new NotificationService();
 const { emitToWorkspace } = require('../config/socket');
 const { invalidateCache, buildKey, cacheWrapper } = require('../utils/cache.utils');
 const logger = require('../config/logger');
+const LabelQueries = require('../db/queries/label.queries');
 
 class TaskService {
   async createTask(projectId, userId, data) {
@@ -1289,38 +1290,75 @@ class TaskService {
     return this.enrichTask(fresh);
   }
 
+
+
+  // async getProjectTasks(projectId, userId, filters = {}) {
+  //   const project = await ProjectQueries.findById(projectId);
+  //   if (!project) throw new Error('Project not found');
+
+  //   const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+  //   if (!hasAccess) throw new Error('You do not have access to this project');
+
+  //   const tasks = await TaskQueries.findByProject(projectId, filters);
+
+  //   if (filters.limit) {
+  //     const total = await TaskQueries.countByProject(projectId, filters);
+  //     return {
+  //       data: tasks.map(this.enrichTask),
+  //       total,
+  //       page: parseInt(filters.page) || 1,
+  //       limit: parseInt(filters.limit),
+  //     };
+  //   }
+
+  //   return tasks.map(this.enrichTask);
+  // }
+
   async getTask(taskId, userId) {
-    const task = await TaskQueries.findById(taskId);
-    if (!task) throw new Error('Task not found');
+  const task = await TaskQueries.findById(taskId);
+  if (!task) throw new Error('Task not found');
 
-    const project = await ProjectQueries.findById(task.project_id);
-    const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
-    if (!hasAccess) throw new Error('You do not have access to this task');
+  const project = await ProjectQueries.findById(task.project_id);
+  const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+  if (!hasAccess) throw new Error('You do not have access to this task');
 
-    return this.enrichTask(task);
-  }
+  // ⬇️ Batch-fetch labels for this task
+  const labelMap = await LabelQueries.getLabelsForTasks([taskId]);
+  const labels = labelMap.get(taskId) || [];
+
+  return this.enrichTask({ ...task, labels });
+}
 
   async getProjectTasks(projectId, userId, filters = {}) {
-    const project = await ProjectQueries.findById(projectId);
-    if (!project) throw new Error('Project not found');
+  const project = await ProjectQueries.findById(projectId);
+  if (!project) throw new Error('Project not found');
 
-    const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
-    if (!hasAccess) throw new Error('You do not have access to this project');
+  const hasAccess = await this.checkWorkspaceAccess(project.workspace_id, userId);
+  if (!hasAccess) throw new Error('You do not have access to this project');
 
-    const tasks = await TaskQueries.findByProject(projectId, filters);
+  const tasks = await TaskQueries.findByProject(projectId, filters);
 
-    if (filters.limit) {
-      const total = await TaskQueries.countByProject(projectId, filters);
-      return {
-        data: tasks.map(this.enrichTask),
-        total,
-        page: parseInt(filters.page) || 1,
-        limit: parseInt(filters.limit),
-      };
-    }
+  // ⬇️ Batch-fetch labels
+  
+  const taskIds = tasks.map((t) => t.id);
+  const labelMap = await LabelQueries.getLabelsForTasks(taskIds);
 
-    return tasks.map(this.enrichTask);
+  const enrichedTasks = tasks.map((t) =>
+    this.enrichTask({ ...t, labels: labelMap.get(t.id) || [] })
+  );
+
+  if (filters.limit) {
+    const total = await TaskQueries.countByProject(projectId, filters);
+    return {
+      data: enrichedTasks,
+      total,
+      page: parseInt(filters.page) || 1,
+      limit: parseInt(filters.limit),
+    };
   }
+
+  return enrichedTasks;
+}
 
   async updateTask(taskId, userId, data) {
     const task = await TaskQueries.findById(taskId);
@@ -1825,40 +1863,81 @@ class TaskService {
     };
   }
 
-  async getMyTasks(userId, filters = {}) {
-    const page = Math.max(1, parseInt(filters.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(filters.limit) || 20));
-    const status = filters.status || 'all';
-    const projectId = filters.projectId || 'all';
+  // async getMyTasks(userId, filters = {}) {
+  //   const page = Math.max(1, parseInt(filters.page) || 1);
+  //   const limit = Math.min(100, Math.max(1, parseInt(filters.limit) || 20));
+  //   const status = filters.status || 'all';
+  //   const projectId = filters.projectId || 'all';
 
-    const cacheKey = buildKey(
-      'mytasks',
-      userId,
-      'status', status,
-      'project', projectId,
-      'page', page,
-      'limit', limit
-    );
+  //   const cacheKey = buildKey(
+  //     'mytasks',
+  //     userId,
+  //     'status', status,
+  //     'project', projectId,
+  //     'page', page,
+  //     'limit', limit
+  //   );
 
-    return cacheWrapper(cacheKey, 30, async () => {
-      const result = await TaskQueries.getMyTasks(userId, {
-        status: filters.status,
-        projectId: filters.projectId,
-        page,
-        limit,
-      });
+  //   return cacheWrapper(cacheKey, 30, async () => {
+  //     const result = await TaskQueries.getMyTasks(userId, {
+  //       status: filters.status,
+  //       projectId: filters.projectId,
+  //       page,
+  //       limit,
+  //     });
 
-      return {
-        data: result.data.map((t) => this.enrichTask(t)),
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        totalPages: result.totalPages,
-      };
-    });
-  }
+  //     return {
+  //       data: result.data.map((t) => this.enrichTask(t)),
+  //       total: result.total,
+  //       page: result.page,
+  //       limit: result.limit,
+  //       totalPages: result.totalPages,
+  //     };
+  //   });
+  // }
 
   // ─── Helpers ────────────────────────────────────────
+  
+  async getMyTasks(userId, filters = {}) {
+  const page = Math.max(1, parseInt(filters.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(filters.limit) || 20));
+  const status = filters.status || 'all';
+  const projectId = filters.projectId || 'all';
+
+  const cacheKey = buildKey(
+    'mytasks',
+    userId,
+    'status', status,
+    'project', projectId,
+    'page', page,
+    'limit', limit
+  );
+
+  return cacheWrapper(cacheKey, 30, async () => {
+    const result = await TaskQueries.getMyTasks(userId, {
+      status: filters.status,
+      projectId: filters.projectId,
+      page,
+      limit,
+    });
+
+    // ⬇️ Batch-fetch labels
+    
+    const taskIds = result.data.map((t) => t.id);
+    const labelMap = await LabelQueries.getLabelsForTasks(taskIds);
+
+    return {
+      data: result.data.map((t) =>
+        this.enrichTask({ ...t, labels: labelMap.get(t.id) || [] })
+      ),
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages,
+    };
+  });
+}
+  
   enrichTask(task) {
     if (!task) return null;
 
@@ -1888,6 +1967,7 @@ class TaskService {
       reporterName: task.reporter_name,
       commentCount: parseInt(task.comment_count || 0),
       attachmentCount: parseInt(task.attachment_count || 0),
+      labels: task.labels || [], 
       createdAt: task.created_at,
       updatedAt: task.updated_at,
       completedAt: task.completed_at,

@@ -1,0 +1,124 @@
+﻿
+> backend@1.0.0 test
+> jest task.service.test.js
+
+  console.error
+    Query error: error: invalid input syntax for type uuid: "task-1"
+        at C:\Users\DELL\Desktop\taskflow\backend\node_modules\pg-pool\index.js:45:11
+        at processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at Function.query (C:\Users\DELL\Desktop\taskflow\backend\src\db\queries\helper.js:7:19)
+        at Function.getLabelsForTasks (C:\Users\DELL\Desktop\taskflow\backend\src\db\queries\label.queries.js:168:20)
+        at C:\Users\DELL\Desktop\taskflow\backend\src\services\task.service.js:1925:22
+        at Object.<anonymous> (C:\Users\DELL\Desktop\taskflow\backend\src\__tests__\unit\task.service.test.js:494:22) {
+      length: 138,
+      severity: 'ERROR',
+      code: '22P02',
+      detail: undefined,
+      hint: undefined,
+      position: undefined,
+      internalPosition: undefined,
+      internalQuery: undefined,
+      where: "unnamed portal parameter $1 = '...'",
+      schema: undefined,
+      table: undefined,
+      column: undefined,
+      dataType: undefined,
+      constraint: undefined,
+      file: 'uuid.c',
+      line: '141',
+      routine: 'string_to_uuid'
+    }
+
+    [0m [90m 10 |[39m       [36mreturn[39m res[33m;[39m
+     [90m 11 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 12 |[39m       [90m/* eslint-disable */[39mconsole[33m.[39merror([33m...[39moo_tx([32m`4180941730_12_6_12_42_11`[39m[33m,[39m[32m'Query error:'[39m[33m,[39m error))[33m;[39m
+     [90m    |[39m                                   [31m[1m^[22m[39m
+     [90m 13 |[39m       [36mthrow[39m error[33m;[39m
+     [90m 14 |[39m     }
+     [90m 15 |[39m   }[0m
+
+      at Function.error (src/db/queries/helper.js:12:35)
+      at Function.getLabelsForTasks (src/db/queries/label.queries.js:168:20)
+      at src/services/task.service.js:1925:22
+      at Object.<anonymous> (src/__tests__/unit/task.service.test.js:494:22)
+
+node.exe : FAIL src/__tests__/unit/task.service.test.js (8.435 s)
+At C:\Program Files\nodejs\npm.ps1:29 char:3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL src/__test...st.js (8.435 s):String) [], RemoteExce 
+   ption
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  TaskService
+    createTask()
+      ΓêÜ should throw if project not found (14 ms)
+      ΓêÜ should throw if user has no workspace access (1 ms)
+      ΓêÜ should create a task with default status and priority (5 ms)
+      ΓêÜ should resolve assignee userId ΓåÆ workspace memberId (1 ms)
+      ΓêÜ should throw if assignee is not a workspace member (1 ms)
+      ΓêÜ should invalidate dashboard cache after create (1 ms)
+    updateTask()
+      ΓêÜ should throw if task not found (2 ms)
+      ΓêÜ should reject MEMBER editing a non-own task (1 ms)
+      ΓêÜ should allow MANAGER to edit any task (2 ms)
+      ΓêÜ should allow MEMBER to edit own task
+      ΓêÜ should detect status change and log activity (1 ms)
+      ΓêÜ should not throw when status is unchanged (1 ms)
+    updateTaskStatus()
+      ΓêÜ should move task and emit socket event (2 ms)
+      ΓêÜ should log COMPLETED activity when moving to DONE (1 ms)
+    deleteTask()
+      ΓêÜ should throw if task not found (1 ms)
+      ΓêÜ should delete the task and invalidate caches (2 ms)
+      ΓêÜ should emit task:deleted socket event (1 ms)
+    archiveTask()
+      ΓêÜ should archive the task (1 ms)
+    unarchiveTask()
+      ΓêÜ should unarchive the task (1 ms)
+    duplicateTask()
+      ΓêÜ should duplicate and emit task:created (1 ms)
+    getTaskStats()
+      ΓêÜ should convert string counts to numbers (1 ms)
+    getMyTasks()
+      ├ù should use cacheWrapper and return paginated data (2066 ms)
+      ΓêÜ should clamp limit to 100 and page to >= 1 (3 ms)
+    enrichTask()
+      ΓêÜ should return null for null input (2 ms)
+      ΓêÜ should map DB snake_case to frontend camelCase (53 ms)
+      ΓêÜ should default comment/attachment counts to 0 when missing (3 ms)
+    checkWorkspaceAccess()
+      ΓêÜ should return true for workspace owner (12 ms)
+      ΓêÜ should return true for workspace member (5 ms)
+      ΓêÜ should return false for outsider (2 ms)
+
+  ΓùÅ TaskService ΓÇ║ getMyTasks() ΓÇ║ should use cacheWrapper and return paginated data
+
+    error: invalid input syntax for type uuid: "task-1"
+
+    [0m [90m  5 |[39m     [36mconst[39m start [33m=[39m 
+[33mDate[39m[33m.[39mnow()[33m;[39m
+     [90m  6 |[39m     [36mtry[39m {
+    [31m[1m>[22m[39m[90m  7 |[39m       [36mconst[39m res [33m=[39m [36mawait[39m 
+pool[33m.[39mquery(text[33m,[39m params)[33m;[39m
+     [90m    |[39m                   [31m[1m^[22m[39m
+     [90m  8 |[39m       [36mconst[39m duration [33m=[39m [33mDate[39m[33m.[39mnow() 
+[33m-[39m start[33m;[39m
+     [90m  9 |[39m       [90m/* eslint-disable */[39mconsole[33m.[39mlog([33m...[39moo_oo([32
+m`4180941730_9_6_9_75_4`[39m[33m,[39m[32m'Executed query'[39m[33m,[39m { text[33m,[39m 
+duration[33m,[39m rows[33m:[39m res[33m.[39mrowCount }))[33m;[39m
+     [90m 10 |[39m       [36mreturn[39m res[33m;[39m[0m
+
+      at node_modules/pg-pool/index.js:45:11
+      at Function.query (src/db/queries/helper.js:7:19)
+      at Function.getLabelsForTasks (src/db/queries/label.queries.js:168:20)
+      at src/services/task.service.js:1925:22
+      at Object.<anonymous> (src/__tests__/unit/task.service.test.js:494:22)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 28 passed, 29 total
+Snapshots:   0 total
+Time:        8.81 s, estimated 18 s
+Ran all test suites matching task.service.test.js.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that 
+kept running after all tests finished?

@@ -12,6 +12,8 @@ import { usePermission } from '../../hooks/usePermission';
 import { ActivityFeed } from '../Activity/ActivityFeed';
 import { useActivityStore } from '../../store/activity.store';
 import { AttachmentList } from '../Attachment/AttachmentList';
+import { LabelPicker } from '../Label/LabelPicker';
+import { taskApi } from '../../api/task.api';
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -35,14 +37,33 @@ export const TaskDetailModal = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { invalidateTask } = useActivityStore();
 
+  // Local copy of the task — allows in-place refresh after label changes
+  const [localTask, setLocalTask] = useState(task);
+
+  // Sync local copy when parent passes a new task
+  useEffect(() => {
+    setLocalTask(task);
+  }, [task?.id]);
+
+  // Refetch handler for LabelPicker
+  const handleLabelUpdate = async () => {
+    if (!localTask?.id) return;
+    try {
+      const fresh = await taskApi.getById(localTask.id);
+      setLocalTask(fresh);
+    } catch (err) {
+      // Silent — labels may be stale but task still renders
+    }
+  };
+
   // ─── RBAC ─────────────────────────────────────────
   const { isMember, isManager } = usePermission(workspaceRole);
 
   const isOwnTask =
-    task &&
-    (task.createdById === user?.id ||
-      task.assigneeUserId === user?.id ||
-      task.assigneeId === user?.id);
+    localTask &&
+    (localTask.createdById === user?.id ||
+      localTask.assigneeUserId === user?.id ||
+      localTask.assigneeId === user?.id);
 
   const canEdit = isManager || (isMember && isOwnTask);
   const canDelete = isManager;
@@ -52,23 +73,20 @@ export const TaskDetailModal = ({
   const hasAnyAction = canEdit || canDelete || canArchive || canDuplicate;
   // ──────────────────────────────────────────────────
 
-  // ─── Load project members for @mention autocomplete
   useEffect(() => {
-    if (isOpen && task?.projectId) {
-      loadProjectMembers(task.projectId);
+    if (isOpen && localTask?.projectId) {
+      loadProjectMembers(localTask.projectId);
     }
-    if (isOpen && task?.id) {
-      // Refresh activity every time the modal opens
-      invalidateTask(task.id);
+    if (isOpen && localTask?.id) {
+      invalidateTask(localTask.id);
     }
-  }, [isOpen, task?.projectId, task?.id]);
-  // ──────────────────────────────────────────────────
+  }, [isOpen, localTask?.projectId, localTask?.id]);
 
-  if (!task) return null;
+  if (!localTask) return null;
 
   const handleDelete = async () => {
     try {
-      await deleteTask(task.id);
+      await deleteTask(localTask.id);
       toast.success('Task deleted');
       onClose();
     } catch (error) {
@@ -78,7 +96,7 @@ export const TaskDetailModal = ({
 
   const handleDuplicate = async () => {
     try {
-      await duplicateTask(task.id);
+      await duplicateTask(localTask.id);
       toast.success('Task duplicated');
       onClose();
     } catch (error) {
@@ -88,7 +106,7 @@ export const TaskDetailModal = ({
 
   const handleArchive = async () => {
     try {
-      await archiveTask(task.id);
+      await archiveTask(localTask.id);
       toast.success('Task archived');
       onClose();
     } catch (error) {
@@ -97,9 +115,9 @@ export const TaskDetailModal = ({
   };
 
   const isOverdue =
-    task.dueDate &&
-    new Date(task.dueDate) < new Date() &&
-    task.status !== 'DONE';
+    localTask.dueDate &&
+    new Date(localTask.dueDate) < new Date() &&
+    localTask.status !== 'DONE';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Task Details" size="lg">
@@ -108,41 +126,53 @@ export const TaskDetailModal = ({
         <div>
           <div className="flex items-start justify-between gap-3 mb-3">
             <h3 className="text-xl font-semibold text-gray-900 flex-1">
-              {task.title}
+              {localTask.title}
             </h3>
             <div className="flex items-center gap-2 shrink-0">
-              <StatusBadge status={task.status} />
-              <PriorityBadge priority={task.priority} />
+              <StatusBadge status={localTask.status} />
+              <PriorityBadge priority={localTask.priority} />
             </div>
           </div>
-          {task.description && (
+          {localTask.description && (
             <p className="text-gray-600 text-sm whitespace-pre-wrap">
-              {task.description}
+              {localTask.description}
             </p>
           )}
+        </div>
+
+        {/* Labels */}
+        <div className="py-3">
+          <p className="text-xs text-gray-500 mb-2">Labels</p>
+          <LabelPicker
+            taskId={localTask.id}
+            projectId={localTask.projectId}
+            currentLabels={localTask.labels || []}
+            disabled={!canEdit}
+            onUpdate={handleLabelUpdate}
+          />
         </div>
 
         {/* Meta Grid */}
         <dl className="grid grid-cols-2 gap-x-4 gap-y-4 py-4 border-t border-b border-gray-100">
           <div>
             <dt className="text-xs font-medium text-gray-500 mb-1">Assignee</dt>
-            {task.assigneeName ? (
+            {localTask.assigneeName ? (
               <dd className="flex items-center gap-2">
-                {task.assigneePicture ? (
+                {localTask.assigneePicture ? (
                   <img
-                    src={task.assigneePicture}
-                    alt={task.assigneeName}
+                    src={localTask.assigneePicture}
+                    alt={localTask.assigneeName}
                     className="h-6 w-6 rounded-full ring-1 ring-gray-100"
                   />
                 ) : (
                   <div className="h-6 w-6 rounded-full bg-indigo-50 flex items-center justify-center ring-1 ring-indigo-100">
                     <span className="text-indigo-600 text-xs font-medium">
-                      {task.assigneeName.charAt(0).toUpperCase()}
+                      {localTask.assigneeName.charAt(0).toUpperCase()}
                     </span>
                   </div>
                 )}
                 <span className="text-sm text-gray-900">
-                  {task.assigneeName}
+                  {localTask.assigneeName}
                 </span>
               </dd>
             ) : (
@@ -153,39 +183,44 @@ export const TaskDetailModal = ({
           <div>
             <dt className="text-xs font-medium text-gray-500 mb-1">Reporter</dt>
             <dd className="text-sm text-gray-900">
-              {task.createdByName || 'Unknown'}
+              {localTask.createdByName || 'Unknown'}
             </dd>
           </div>
 
           <div>
             <dt className="text-xs font-medium text-gray-500 mb-1">Due Date</dt>
             <dd
-              className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-900'
-                }`}
+              className={`text-sm ${
+                isOverdue ? 'text-red-600 font-medium' : 'text-gray-900'
+              }`}
             >
-              {task.dueDate
-                ? new Date(task.dueDate).toLocaleDateString()
+              {localTask.dueDate
+                ? new Date(localTask.dueDate).toLocaleDateString()
                 : 'Not set'}
               {isOverdue && ' (Overdue)'}
             </dd>
           </div>
 
           <div>
-            <dt className="text-xs font-medium text-gray-500 mb-1">Story Points</dt>
-            <dd className="text-sm text-gray-900">{task.storyPoints || '—'}</dd>
+            <dt className="text-xs font-medium text-gray-500 mb-1">
+              Story Points
+            </dt>
+            <dd className="text-sm text-gray-900">
+              {localTask.storyPoints || '—'}
+            </dd>
           </div>
 
           <div>
             <dt className="text-xs font-medium text-gray-500 mb-1">Created</dt>
             <dd className="text-sm text-gray-900">
-              {new Date(task.createdAt).toLocaleDateString()}
+              {new Date(localTask.createdAt).toLocaleDateString()}
             </dd>
           </div>
 
           <div>
             <dt className="text-xs font-medium text-gray-500 mb-1">Updated</dt>
             <dd className="text-sm text-gray-900">
-              {new Date(task.updatedAt).toLocaleDateString()}
+              {new Date(localTask.updatedAt).toLocaleDateString()}
             </dd>
           </div>
         </dl>
@@ -194,25 +229,31 @@ export const TaskDetailModal = ({
         <div className="flex items-center gap-6 text-sm text-gray-500">
           <div className="flex items-center">
             <ChatBubbleLeftIcon className="h-4 w-4 mr-1.5" />
-            <span>{task.commentCount || 0} comments</span>
+            <span>{localTask.commentCount || 0} comments</span>
           </div>
           <div className="flex items-center">
             <PaperClipIcon className="h-4 w-4 mr-1.5" />
-            <span>{task.attachmentCount || 0} attachments</span>
+            <span>{localTask.attachmentCount || 0} attachments</span>
           </div>
         </div>
 
         {/* Comments */}
         <div className="pt-4 border-t border-gray-100">
-          <CommentList taskId={task.id} workspaceRole={workspaceRole} />
-        </div>
-        <div className="pt-4 border-t border-gray-100">
-          <h4 className="text-sm font-semibold text-gray-900 mb-2">Activity</h4>
-          <ActivityFeed scope="task" id={task.id} compact />
+          <CommentList taskId={localTask.id} workspaceRole={workspaceRole} />
         </div>
 
+        {/* Activity */}
+        <div className="pt-4 border-t border-gray-100">
+          <h4 className="text-sm font-semibold text-gray-900 mb-2">Activity</h4>
+          <ActivityFeed scope="task" id={localTask.id} compact />
+        </div>
+
+        {/* Attachments */}
         <div className="pt-4 border-t border-gray-200">
-          <AttachmentList taskId={task.id} workspaceRole={workspaceRole} />
+          <AttachmentList
+            taskId={localTask.id}
+            workspaceRole={workspaceRole}
+          />
         </div>
 
         {/* Actions */}

@@ -12,6 +12,9 @@ import { useTaskStore } from '../store/task.store';
 import { useWorkspaceStore } from '../store/workspace.store';
 import { usePermission } from '../hooks/usePermission';
 import { taskApi } from '../api/task.api';
+import { LabelFilter } from '../components/Label/LabelFilter';
+import { LabelBadge } from '../components/Label/LabelBadge';
+
 import {
   PlusIcon,
   MagnifyingGlassIcon,
@@ -23,7 +26,7 @@ import {
 export const Tasks = () => {
   const { workspaceId, projectId } = useParams();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();   // ⬅️ ADDED
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { tasks, loadProjectTasks, isLoading, pagination } = useTaskStore();
   const { workspaces, loadWorkspaces } = useWorkspaceStore();
@@ -40,6 +43,7 @@ export const Tasks = () => {
   const [sortBy, setSortBy] = useState('position');
   const [sortOrder, setSortOrder] = useState('asc');
   const [page, setPage] = useState(1);
+  const [selectedLabelIds, setSelectedLabelIds] = useState([]);
 
   // RBAC
   const workspace = workspaces.find((w) => w.id === workspaceId);
@@ -58,53 +62,53 @@ export const Tasks = () => {
     }
   }, []);
 
-const loadTasks = () => {
-  if (!projectId) {
-    console.warn('⚠️ loadTasks called without projectId — skipping');
-    return;
-  }
-  
-  const filters = {
-    search: searchQuery || undefined,
-    status: statusFilter || undefined,
-    priority: priorityFilter || undefined,
-    sortBy,
-    sortOrder,
-    page,
-    limit: 20,
+  // Load tasks
+  const loadTasks = () => {
+    if (!projectId) {
+      console.warn('⚠️ loadTasks called without projectId — skipping');
+      return;
+    }
+
+    const filters = {
+      search: searchQuery || undefined,
+      status: statusFilter || undefined,
+      priority: priorityFilter || undefined,
+      sortBy,
+      sortOrder,
+      page,
+      limit: 20,
+    };
+    loadProjectTasks(projectId, filters);
   };
-  loadProjectTasks(projectId, filters);
-};
 
-useEffect(() => {
-  if (!projectId) return;
-  loadTasks();
-}, [projectId, statusFilter, priorityFilter, sortBy, sortOrder, page]);
+  // Toggle label filter
+  const handleToggleLabel = (labelId) => {
+    setSelectedLabelIds((prev) =>
+      prev.includes(labelId)
+        ? prev.filter((id) => id !== labelId)
+        : [...prev, labelId]
+    );
+  };
 
-useEffect(() => {
-  if (!projectId) return;
-  
-  const timer = setTimeout(() => {
-    if (searchQuery !== undefined) {
+  // Reload tasks when filters change
+  useEffect(() => {
+    if (!projectId) return;
+    loadTasks();
+  }, [projectId, statusFilter, priorityFilter, sortBy, sortOrder, page]);
+
+  // Debounced search (single effect)
+  useEffect(() => {
+    if (!projectId) return;
+
+    const timer = setTimeout(() => {
       setPage(1);
       loadTasks();
-    }
-  }, 400);
-  return () => clearTimeout(timer);
-}, [searchQuery, projectId]);
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery !== undefined) {
-        setPage(1);
-        loadTasks();
-      }
     }, 400);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
 
-  // ─── ⬇️ DEEP-LINK: Open task modal from ?taskId=xxx ───
+    return () => clearTimeout(timer);
+  }, [searchQuery, projectId]);
+
+  // ─── Deep-link: Open task modal from ?taskId=xxx ───
   useEffect(() => {
     const taskIdParam = searchParams.get('taskId');
     if (!taskIdParam) return;
@@ -117,7 +121,6 @@ useEffect(() => {
       } catch (error) {
         toast.error('Task not found or you do not have access');
       } finally {
-        // Clean URL — remove query param so refresh doesn't reopen
         const next = new URLSearchParams(searchParams);
         next.delete('taskId');
         setSearchParams(next, { replace: true });
@@ -126,7 +129,34 @@ useEffect(() => {
 
     fetchAndOpenTask();
   }, [searchParams, setSearchParams]);
-  // ────────────────────────────────────────────────────────
+
+  // Listen for task-updated events (from LabelPicker)
+useEffect(() => {
+  const handler = async (e) => {
+    if (!selectedTask || e.detail?.taskId !== selectedTask.id) return;
+    try {
+      const fresh = await taskApi.getById(selectedTask.id);
+      setSelectedTask(fresh);
+      useTaskStore.getState().updateTaskInList(fresh.id, {
+        labels: fresh.labels,
+      });
+    } catch (err) {}
+  };
+
+  window.addEventListener('task-updated', handler);
+  return () => window.removeEventListener('task-updated', handler);
+}, [selectedTask?.id]);
+  // ────────────────────────────────────────────────────
+
+  // ⬇️ Filter tasks by selected labels (client-side)
+  const filteredTasks =
+    selectedLabelIds.length > 0
+      ? tasks.filter((task) =>
+          selectedLabelIds.some((labelId) =>
+            (task.labels || []).some((l) => l.id === labelId)
+          )
+        )
+      : tasks;
 
   const handleTaskClick = (task) => {
     setSelectedTask(task);
@@ -145,9 +175,11 @@ useEffect(() => {
     setSortBy('position');
     setSortOrder('asc');
     setPage(1);
+    setSelectedLabelIds([]);
   };
 
   const hasActiveFilters = searchQuery || statusFilter || priorityFilter;
+  const hasLabelFilters = selectedLabelIds.length > 0;
   const selectClass =
     'px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors';
 
@@ -166,7 +198,9 @@ useEffect(() => {
             <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
           </button>
           <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Tasks</h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
+              Tasks
+            </h2>
             <p className="text-gray-500 mt-1">
               {pagination?.total || tasks.length} tasks total
             </p>
@@ -267,25 +301,50 @@ useEffect(() => {
           )}
         </div>
 
+        {/* Label Filter */}
+        {projectId && (
+          <div className="mb-6">
+            <LabelFilter
+              projectId={projectId}
+              selectedLabelIds={selectedLabelIds}
+              onToggle={handleToggleLabel}
+            />
+          </div>
+        )}
+
         {/* Tasks List */}
         {isLoading && tasks.length === 0 ? (
           <div className="flex justify-center py-16">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
           </div>
-        ) : tasks.length === 0 ? (
+        ) : filteredTasks.length === 0 ? (
           <EmptyState
             icon="✅"
-            title={hasActiveFilters ? 'No tasks found' : 'No tasks yet'}
+            title={
+              hasLabelFilters
+                ? 'No tasks match the selected labels'
+                : hasActiveFilters
+                ? 'No tasks found'
+                : 'No tasks yet'
+            }
             description={
-              hasActiveFilters
+              hasLabelFilters
+                ? 'Try removing some label filters'
+                : hasActiveFilters
                 ? 'Try adjusting your filters'
                 : isMember
                 ? 'Create your first task to get started'
                 : 'No tasks have been created yet'
             }
-            actionLabel={!hasActiveFilters && isMember ? 'Create Task' : undefined}
+            actionLabel={
+              !hasActiveFilters && !hasLabelFilters && isMember
+                ? 'Create Task'
+                : undefined
+            }
             onAction={
-              !hasActiveFilters && isMember ? () => setShowCreateModal(true) : undefined
+              !hasActiveFilters && !hasLabelFilters && isMember
+                ? () => setShowCreateModal(true)
+                : undefined
             }
           />
         ) : (
@@ -295,6 +354,9 @@ useEffect(() => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                     Task
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                    Labels
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
                     Status
@@ -311,7 +373,7 @@ useEffect(() => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {tasks.map((task) => {
+                {filteredTasks.map((task) => {
                   const isOverdue =
                     task.dueDate &&
                     new Date(task.dueDate) < new Date() &&
@@ -336,6 +398,29 @@ useEffect(() => {
                           </div>
                         </div>
                       </td>
+
+                      {/* Labels cell */}
+                      <td className="px-6 py-4">
+                        {task.labels && task.labels.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {task.labels.slice(0, 2).map((label) => (
+                              <LabelBadge
+                                key={label.id}
+                                label={label}
+                                size="xs"
+                              />
+                            ))}
+                            {task.labels.length > 2 && (
+                              <span className="text-[10px] text-gray-500 self-center">
+                                +{task.labels.length - 2}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <StatusBadge status={task.status} />
                       </td>
@@ -405,7 +490,10 @@ useEffect(() => {
                       pagination.total
                     )}
                   </span>{' '}
-                  of <span className="font-medium text-gray-900">{pagination.total}</span>{' '}
+                  of{' '}
+                  <span className="font-medium text-gray-900">
+                    {pagination.total}
+                  </span>{' '}
                   results
                 </div>
                 <div className="flex gap-2">
@@ -455,10 +543,12 @@ useEffect(() => {
         {/* Task Detail Modal */}
         <TaskDetailModal
           isOpen={showDetail}
-          onClose={() => {
-            setShowDetail(false);
-            setSelectedTask(null);
-          }}
+           onClose={() => {
+    setShowDetail(false);
+    setSelectedTask(null);
+    // ⬇️ Refetch so labels are fresh
+    loadTasks();
+  }}
           task={selectedTask}
           onEdit={isMember ? handleEditTask : undefined}
           workspaceRole={workspaceRole}
