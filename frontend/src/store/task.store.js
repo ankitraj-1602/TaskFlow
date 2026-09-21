@@ -324,4 +324,22 @@ reorderTasks: async (projectId, status, taskIds) => {
     throw error;
   }
 },
+updateTaskInList: (taskId, updates) => {
+  set((state) => ({
+    tasks: state.tasks.map((t) =>
+      t.id === taskId ? { ...t, ...updates } : t
+    ),
+  }));
+},
+// Update a task in-place in both `tasks` and `myTasks` arrays
+updateTaskInList: (taskId, updates) => {
+  set((state) => ({
+    tasks: state.tasks.map((t) =>
+      t.id === taskId ? { ...t, ...updates } : t
+    ),
+    myTasks: state.myTasks.map((t) =>
+      t.id === taskId ? { ...t, ...updates } : t
+    ),
+  }));
+},
 }));

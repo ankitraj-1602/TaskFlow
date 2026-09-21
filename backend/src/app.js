@@ -17,6 +17,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const attachmentRoutes = require('./routes/attachment.routes');
 const searchRoutes = require('./routes/search.routes');
+const labelRoutes = require('./routes/label.routes');
 
 // ─── Middleware & Controllers ──────────────────────
 const { apiRateLimiter } = require('./middleware/rateLimit.middleware');
@@ -70,6 +71,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api', commentRoutes);
 app.use('/api', activityRoutes);
 app.use('/api', dashboardRoutes);
+app.use('/api', labelRoutes);
 
 // Serve uploaded files (public — URLs contain random UUIDs)
 app.get('/uploads/:year/:month/:filename', AttachmentController.serve);

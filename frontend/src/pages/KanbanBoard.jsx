@@ -10,6 +10,7 @@ import { TaskDetailModal } from '../components/Task/TaskDetailModal';
 import { useTaskStore } from '../store/task.store';
 import { useWorkspaceStore } from '../store/workspace.store';
 import { usePermission } from '../hooks/usePermission';
+import { taskApi } from '../api/task.api';
 import {
   ArrowLeftIcon,
   PlusIcon,
@@ -27,7 +28,14 @@ const COLUMNS = [
 export const KanbanBoard = () => {
   const { workspaceId, projectId } = useParams();
   const navigate = useNavigate();
-const { tasks, loadProjectTasks, updateTaskStatus, reorderTasks, isLoading } = useTaskStore();
+
+  const {
+    tasks,
+    loadProjectTasks,
+    updateTaskStatus,
+    reorderTasks,
+    isLoading,
+  } = useTaskStore();
   const { workspaces, loadWorkspaces } = useWorkspaceStore();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -46,30 +54,51 @@ const { tasks, loadProjectTasks, updateTaskStatus, reorderTasks, isLoading } = u
     : 'VIEWER';
 
   const { isMember } = usePermission(workspaceRole);
-  // isMember = OWNER | ADMIN | MANAGER | MEMBER (VIEWER excluded)
 
-  const canDrag = isMember;   // ⬅️ KEY: only MEMBER+ can drag
-  const canCreate = isMember; // ⬅️ "+" button gating
+  const canDrag = isMember;
+  const canCreate = isMember;
   // ──────────────────────────────────────────────────
 
   useEffect(() => {
     loadWorkspaces().catch(() => {});
-    loadProjectTasks(projectId, { limit: 1000 });
-  }, [projectId]);
+  }, [loadWorkspaces]);
 
-const getTasksForColumn = (status) => {
-  return tasks
-    .filter((task) => {
-      if (task.status !== status) return false;
-      if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
-      return (
-        task.title?.toLowerCase().includes(q) ||
-        task.description?.toLowerCase().includes(q)
-      );
-    })
-    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-};
+  useEffect(() => {
+    if (!projectId) return;
+    // Fetch up to 1000 tasks so Kanban shows everything
+    loadProjectTasks(projectId, { limit: 1000 });
+  }, [projectId, loadProjectTasks]);
+
+  // Listen for task-updated events (from LabelPicker)
+useEffect(() => {
+  const handler = async (e) => {
+    if (!selectedTask || e.detail?.taskId !== selectedTask.id) return;
+    try {
+      const fresh = await taskApi.getById(selectedTask.id);
+      setSelectedTask(fresh);
+      useTaskStore.getState().updateTaskInList(fresh.id, {
+        labels: fresh.labels,
+      });
+    } catch (err) {}
+  };
+
+  window.addEventListener('task-updated', handler);
+  return () => window.removeEventListener('task-updated', handler);
+}, [selectedTask?.id]);
+
+  const getTasksForColumn = (status) => {
+    return tasks
+      .filter((task) => {
+        if (task.status !== status) return false;
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+          task.title?.toLowerCase().includes(q) ||
+          task.description?.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  };
 
   const handleTaskClick = (task) => {
     setSelectedTask(task);
@@ -91,28 +120,24 @@ const getTasksForColumn = (status) => {
     setCreateInColumn(null);
   };
 
-const handleTaskMove = async (
-  taskId,
-  newStatus,
-  newPosition,
-  reorderedTasks = null
-) => {
-  try {
-    if (reorderedTasks) {
-      // Same-column reorder: persist the entire column order
-      const taskIds = reorderedTasks.map((t) => t.id);
-      await reorderTasks(projectId, newStatus, taskIds);
-
-      // Optimistically update local store with new order
-      useTaskStore.getState().applyLocalReorder(newStatus, taskIds);
-    } else {
-      // Cross-column move: update status + position
-      await updateTaskStatus(taskId, newStatus, newPosition);
+  const handleTaskMove = async (
+    taskId,
+    newStatus,
+    newPosition,
+    reorderedTasks = null
+  ) => {
+    try {
+      if (reorderedTasks) {
+        const taskIds = reorderedTasks.map((t) => t.id);
+        await reorderTasks(projectId, newStatus, taskIds);
+        useTaskStore.getState().applyLocalReorder(newStatus, taskIds);
+      } else {
+        await updateTaskStatus(taskId, newStatus, newPosition);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to move task');
     }
-  } catch (error) {
-    toast.error(error.response?.data?.message || 'Failed to move task');
-  }
-};
+  };
 
   return (
     <ProtectedLayout>
@@ -177,7 +202,7 @@ const handleTaskMove = async (
               tasks={tasks}
               onTaskMove={handleTaskMove}
               onTaskClick={handleTaskClick}
-              canDrag={canDrag}   
+              canDrag={canDrag}
             >
               {COLUMNS.map((column) => (
                 <KanbanColumn
@@ -188,7 +213,7 @@ const handleTaskMove = async (
                   onAddTask={() => handleAddInColumn(column.id)}
                   onTaskMove={handleTaskMove}
                   canCreate={canCreate}
-                  canDrag={canDrag}  
+                  canDrag={canDrag}
                   projectId={projectId}
                 />
               ))}
@@ -221,9 +246,11 @@ const handleTaskMove = async (
         <TaskDetailModal
           isOpen={showDetail}
           onClose={() => {
-            setShowDetail(false);
-            setSelectedTask(null);
-          }}
+    setShowDetail(false);
+    setSelectedTask(null);
+    // ⬇️ Refetch so labels are fresh
+    loadProjectTasks(projectId, { limit: 1000 });
+  }}
           task={selectedTask}
           onEdit={isMember ? handleEditTask : undefined}
           workspaceRole={workspaceRole}

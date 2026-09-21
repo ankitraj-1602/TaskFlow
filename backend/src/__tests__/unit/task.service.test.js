@@ -2,6 +2,18 @@
 jest.mock('../../db/queries/task.queries');
 jest.mock('../../db/queries/project.queries');
 jest.mock('../../db/queries/workspace.queries');
+jest.mock('../../db/queries/label.queries', () => ({
+  getLabelsForTasks: jest.fn().mockResolvedValue(new Map()),
+  getTaskLabels: jest.fn().mockResolvedValue([]),
+  findById: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+  findByProject: jest.fn().mockResolvedValue([]),
+  findByName: jest.fn(),
+  attachToTask: jest.fn(),
+  detachFromTask: jest.fn(),
+}));
 jest.mock('../../config/socket', () => ({
   emitToWorkspace: jest.fn(),
   emitToUser: jest.fn(),

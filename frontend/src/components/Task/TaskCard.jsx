@@ -7,6 +7,7 @@ import {
   PaperClipIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
+import { LabelBadge } from '../Label/LabelBadge';
 
 export const TaskCard = ({ task, onClick, isDragging }) => {
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE';
@@ -25,6 +26,18 @@ export const TaskCard = ({ task, onClick, isDragging }) => {
         </h4>
         <PriorityBadge priority={task.priority} size="sm" />
       </div>
+      {task.labels && task.labels.length > 0 && (
+  <div className="flex flex-wrap gap-1 mt-1.5">
+    {task.labels.slice(0, 3).map((label) => (
+      <LabelBadge key={label.id} label={label} size="xs" />
+    ))}
+    {task.labels.length > 3 && (
+      <span className="text-[10px] text-gray-500 self-center">
+        +{task.labels.length - 3}
+      </span>
+    )}
+  </div>
+)}
 
       {/* Description preview */}
       {task.description && (

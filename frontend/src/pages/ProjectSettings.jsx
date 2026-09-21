@@ -9,6 +9,7 @@ import { Input } from '../components/Forms/Input';
 import { Button } from '../components/Forms/Button';
 import { Modal } from '../components/UI/Modal';
 import { useProjectStore } from '../store/project.store';
+import { LabelManager } from '../components/Label/LabelManager';
 import { ArrowLeftIcon, ArchiveBoxIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 const updateProjectSchema = z.object({
@@ -193,6 +194,9 @@ export const ProjectSettings = () => {
             </div>
           </form>
         </div>
+                    <div className="bg-white rounded-lg shadow p-6 mb-6">
+  <LabelManager projectId={projectId} />
+</div>
 
         {/* Archive Section */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
