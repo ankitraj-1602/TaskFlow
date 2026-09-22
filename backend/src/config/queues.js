@@ -143,6 +143,7 @@
     port: parseInt(redisUrl.port || '6379'),
     password: redisUrl.password || undefined,
     username: redisUrl.username || undefined,
+    family:0,
     tls: isTLS ? {} : undefined,
     maxRetriesPerRequest: null,
     enableReadyCheck: false,

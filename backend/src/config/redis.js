@@ -123,6 +123,7 @@ require('dotenv').config();
 const client = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   socket: {
+    family:0,
     tls: process.env.REDIS_URL?.startsWith('rediss://') || false,
     keepAlive: 30000,
     reconnectStrategy: (retries) => {
