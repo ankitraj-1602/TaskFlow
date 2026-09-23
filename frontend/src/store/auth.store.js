@@ -2,6 +2,37 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi } from '../api/auth.api';
 import { useSocketStore } from './socket.store';
+import { useWorkspaceStore } from './workspace.store';
+import { useDashboardStore } from './dashboard.store';
+import { useTaskStore } from './task.store';
+import { useLabelStore } from './label.store';
+import { useNotificationStore } from './notification.store';
+import { useProjectStore } from './project.store';
+import { useActivityStore } from './activity.store';
+import { useCommentStore } from './comment.store';
+import { useAttachmentStore } from './attachment.store';
+
+/**
+ * Clears all non-auth stores so the next user starts with a clean slate.
+ */
+const clearAllStores = () => {
+  const clearIfPresent = (store) => {
+    try {
+      store.getState().clear?.();
+    } catch (err) {
+      // Silent
+    }
+  };
+  clearIfPresent(useWorkspaceStore);
+  clearIfPresent(useDashboardStore);
+  clearIfPresent(useTaskStore);
+  clearIfPresent(useLabelStore);
+  clearIfPresent(useNotificationStore);
+  clearIfPresent(useProjectStore);
+  clearIfPresent(useActivityStore);
+  clearIfPresent(useCommentStore);
+  clearIfPresent(useAttachmentStore);
+};
 
 export const useAuthStore = create(
   persist(
@@ -17,6 +48,8 @@ export const useAuthStore = create(
         try {
           const response = await authApi.login({ email, password });
           const { user, tokens } = response;
+
+          clearAllStores();
 
           localStorage.setItem('accessToken', tokens.accessToken);
           localStorage.setItem('refreshToken', tokens.refreshToken);
@@ -41,6 +74,8 @@ export const useAuthStore = create(
           const response = await authApi.register(data);
           const { user, tokens } = response;
 
+          clearAllStores();
+
           localStorage.setItem('accessToken', tokens.accessToken);
           localStorage.setItem('refreshToken', tokens.refreshToken);
           localStorage.setItem('user', JSON.stringify(user));
@@ -58,16 +93,17 @@ export const useAuthStore = create(
         }
       },
 
-     logout: async () => {
-  try {
-    await authApi.logout();
-  } catch (error) {
-    // Ignore
-  } finally {
-    useSocketStore.getState().disconnect();
-    get().clearAuth();
-  }
-},
+      logout: async () => {
+        try {
+          await authApi.logout();
+        } catch (error) {
+          // Ignore
+        } finally {
+          useSocketStore.getState().disconnect();
+          clearAllStores();
+          get().clearAuth();
+        }
+      },
 
       logoutAll: async () => {
         try {
@@ -75,13 +111,15 @@ export const useAuthStore = create(
         } catch (error) {
           // Ignore logout errors
         } finally {
+          useSocketStore.getState().disconnect();
+          clearAllStores();
           get().clearAuth();
         }
       },
 
       loadUser: async () => {
         const { isAuthenticated, accessToken } = get();
-        
+
         if (!isAuthenticated || !accessToken) {
           return;
         }

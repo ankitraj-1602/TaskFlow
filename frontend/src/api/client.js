@@ -254,12 +254,13 @@ apiClient.interceptors.response.use(
         error.response.data.correlationId = correlationId;
       }
     }
-
-    // Don't retry auth endpoints (prevents infinite loops)
-    const isAuthEndpoint =
-      originalRequest?.url?.includes('/auth/refresh-token') ||
-      originalRequest?.url?.includes('/auth/login') ||
-      originalRequest?.url?.includes('/auth/register');
+const isAuthEndpoint =
+  originalRequest?.url?.includes('/auth/refresh-token') ||
+  originalRequest?.url?.includes('/auth/login') ||
+  originalRequest?.url?.includes('/auth/register') ||
+  originalRequest?.url?.includes('/auth/verify-email') ||      // ⬅️ ADD
+  originalRequest?.url?.includes('/auth/forgot-password') ||   // ⬅️ ADD
+  originalRequest?.url?.includes('/auth/reset-password');      // ⬅️ ADD
 
     if (
       error.response?.status === 401 &&

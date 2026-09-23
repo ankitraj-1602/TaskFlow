@@ -70,11 +70,11 @@ export const useCommentStore = create((set, get) => ({
           replies: (c.replies || []).map((r) =>
             r.id === commentId
               ? {
-                  ...r,
-                  content: updated.content,
-                  isEdited: updated.isEdited,
-                  editedAt: updated.editedAt,
-                }
+                ...r,
+                content: updated.content,
+                isEdited: updated.isEdited,
+                editedAt: updated.editedAt,
+              }
               : r
           ),
         };
@@ -141,11 +141,11 @@ export const useCommentStore = create((set, get) => ({
           replies: (c.replies || []).map((r) =>
             r.id === comment.id
               ? {
-                  ...r,
-                  content: comment.content,
-                  isEdited: comment.isEdited,
-                  editedAt: comment.editedAt,
-                }
+                ...r,
+                content: comment.content,
+                isEdited: comment.isEdited,
+                editedAt: comment.editedAt,
+              }
               : r
           ),
         };
@@ -166,6 +166,10 @@ export const useCommentStore = create((set, get) => ({
 
   // ─── Cleanup ──────────────────────────────────────
   clearComments: () => {
+    set({ comments: [], taskId: null });
+  },
+
+  clear: () => {
     set({ comments: [], taskId: null });
   },
 }));

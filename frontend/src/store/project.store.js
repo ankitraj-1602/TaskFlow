@@ -206,6 +206,20 @@ export const useProjectStore = create((set, get) => ({
       projectMembers: [],
       availableMembers: [],
       lastMembersLoadedForId: null,
+      isLoading: false,
+      isLoadingMembers: false,
+    });
+  },
+
+  clear: () => {
+    set({
+      projects: [],
+      currentProject: null,
+      projectMembers: [],
+      availableMembers: [],
+      lastMembersLoadedForId: null,
+      isLoading: false,
+      isLoadingMembers: false,
     });
   },
 }));
