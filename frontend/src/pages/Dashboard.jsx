@@ -36,24 +36,36 @@ export const Dashboard = () => {
 
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null);
 
-  // Load workspaces on mount
+  // Load workspaces only when user is authenticated
   useEffect(() => {
+    if (!user) return;
+    if (workspaces.length > 0) {
+      if (!selectedWorkspaceId) setSelectedWorkspaceId(workspaces[0].id);
+      return;
+    }
+
     loadWorkspaces()
       .then((list) => {
         if (list.length > 0 && !selectedWorkspaceId) {
           setSelectedWorkspaceId(list[0].id);
         }
       })
-      .catch(() => toast.error('Failed to load workspaces'));
-  }, []);
+      .catch((error) => {
+        if (error.response?.status !== 401) {
+          toast.error('Failed to load workspaces');
+        }
+      });
+  }, [user, workspaces.length, selectedWorkspaceId]);
 
   // Load dashboard when workspace changes
   useEffect(() => {
-    if (selectedWorkspaceId) {
-      loadDashboard(selectedWorkspaceId).catch(() =>
-        toast.error('Failed to load dashboard')
-      );
-    }
+    if (!selectedWorkspaceId) return;
+
+    loadDashboard(selectedWorkspaceId).catch((error) => {
+      if (error.response?.status !== 401) {
+        toast.error('Failed to load dashboard');
+      }
+    });
   }, [selectedWorkspaceId]);
 
   const handleRangeChange = async (days) => {
