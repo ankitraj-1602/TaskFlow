@@ -123,4 +123,15 @@ export const useNotificationStore = create((set, get) => ({
     if (id) clearInterval(id);
     set({ pollingInterval: null });
   },
+
+  clear: () => {
+    const id = get().pollingInterval;
+    if (id) clearInterval(id);
+    set({
+      notifications: [],
+      unreadCount: 0,
+      isLoading: false,
+      pollingInterval: null,
+    });
+  },
 }));

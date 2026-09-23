@@ -95,4 +95,12 @@ export const useActivityStore = create((set, get) => ({
       workspaceActivities: {},
     });
   },
+
+  clear: () => {
+    set({
+      taskActivities: {},
+      projectActivities: {},
+      workspaceActivities: {},
+    });
+  },
 }));

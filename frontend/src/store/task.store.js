@@ -227,34 +227,34 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-loadMyTasks: async (filters = {}) => {
-  set({ isLoading: true });
-  try {
-    const response = await taskApi.getMyTasks(filters);
+  loadMyTasks: async (filters = {}) => {
+    set({ isLoading: true });
+    try {
+      const response = await taskApi.getMyTasks(filters);
 
-    // Response shape:
-    // { success, data: [...tasks], pagination: { page, limit, total, totalPages, hasNext, hasPrev } }
+      // Response shape:
+      // { success, data: [...tasks], pagination: { page, limit, total, totalPages, hasNext, hasPrev } }
 
-    const tasks = response.data || [];
-    const pagination = response.pagination || null;
+      const tasks = response.data || [];
+      const pagination = response.pagination || null;
 
-    set({
-      myTasks: tasks,
-      myTasksPagination: pagination
-        ? {
+      set({
+        myTasks: tasks,
+        myTasksPagination: pagination
+          ? {
             page: pagination.page,
             limit: pagination.limit,
             total: pagination.total,
             totalPages: pagination.totalPages,
           }
-        : null,
-      isLoading: false,
-    });
-  } catch (error) {
-    set({ isLoading: false });
-    throw error;
-  }
-},
+          : null,
+        isLoading: false,
+      });
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
 
   // ─── Socket-driven updates (idempotent) ───────────
   addTaskFromSocket: (task) => {
@@ -308,38 +308,49 @@ loadMyTasks: async (filters = {}) => {
 
   // ─── Cleanup ──────────────────────────────────────
   clearTasks: () => {
-    set({ tasks: [], currentTask: null, stats: null, pagination: null });
+    set({
+      tasks: [],
+      currentTask: null,
+      stats: null,
+      pagination: null,
+      myTasks: [],
+      myTasksPagination: null,
+    });
   },
 
-reorderTasks: async (projectId, status, taskIds) => {
-  // Optimistic update first
-  get().applyLocalReorder(status, taskIds);
+  clear: () => {
+    set({
+      tasks: [],
+      currentTask: null,
+      stats: null,
+      pagination: null,
+      myTasks: [],
+      myTasksPagination: null,
+    });
+  },
 
-  try {
-    await taskApi.reorder(projectId, { status, taskIds });
-    return true;
-  } catch (error) {
-    // On failure, refetch to restore true order
-    await get().loadProjectTasks(projectId, { limit: 500 });
-    throw error;
-  }
-},
-updateTaskInList: (taskId, updates) => {
-  set((state) => ({
-    tasks: state.tasks.map((t) =>
-      t.id === taskId ? { ...t, ...updates } : t
-    ),
-  }));
-},
-// Update a task in-place in both `tasks` and `myTasks` arrays
-updateTaskInList: (taskId, updates) => {
-  set((state) => ({
-    tasks: state.tasks.map((t) =>
-      t.id === taskId ? { ...t, ...updates } : t
-    ),
-    myTasks: state.myTasks.map((t) =>
-      t.id === taskId ? { ...t, ...updates } : t
-    ),
-  }));
-},
+  reorderTasks: async (projectId, status, taskIds) => {
+    // Optimistic update first
+    get().applyLocalReorder(status, taskIds);
+
+    try {
+      await taskApi.reorder(projectId, { status, taskIds });
+      return true;
+    } catch (error) {
+      // On failure, refetch to restore true order
+      await get().loadProjectTasks(projectId, { limit: 500 });
+      throw error;
+    }
+  },
+  // Update a task in-place in both `tasks` and `myTasks` arrays
+  updateTaskInList: (taskId, updates) => {
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.id === taskId ? { ...t, ...updates } : t
+      ),
+      myTasks: state.myTasks.map((t) =>
+        t.id === taskId ? { ...t, ...updates } : t
+      ),
+    }));
+  },
 }));
