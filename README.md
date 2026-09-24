@@ -5,11 +5,11 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-A production-style multi-tenant project management SaaS with authentication, RBAC, real-time collaboration, caching, background jobs, and CI/CD.
+A production-style multi-tenant project management SaaS with authentication, RBAC, real-time collaboration, caching, background jobs, multi-session support, and CI/CD.
 
-**Live Demo:** https://task-flow-tau-amber.vercel.app
-**API:** https://taskflow-90rv.onrender.com
-**Health Check:** https://taskflow-90rv.onrender.com/health
+**Live Demo:** https://task-flow-tau-amber.vercel.app  
+**API:** https://taskflow-backend-production-0006.up.railway.app  
+**Health Check:** https://taskflow-backend-production-0006.up.railway.app/health
 
 ---
 
@@ -19,6 +19,7 @@ A production-style multi-tenant project management SaaS with authentication, RBA
 - JWT access + refresh tokens
 - Email verification
 - Forgot / reset password
+- **Multi-device session management** — see and revoke active sessions per device
 - Logout all devices
 - Account deletion with soft-delete
 
@@ -38,6 +39,13 @@ A production-style multi-tenant project management SaaS with authentication, RBA
 - Position-based reordering
 - Filters + My Tasks pagination
 - Duplicate, archive, restore
+
+### Labels / Tags
+- Per-project custom labels
+- Color-coded badges
+- Attach multiple labels to a task
+- Filter tasks by label
+- Real-time sync across users
 
 ### Collaboration
 - Task comments with nested replies
@@ -69,43 +77,55 @@ A production-style multi-tenant project management SaaS with authentication, RBA
 - Project progress bars
 - Overdue breakdown
 
+### Security
+- JWT with 15m access + 7d refresh tokens
+- Refresh token rotation
+- Per-session tracking with instant revocation
+- Bcrypt password hashing
+- Rate limiting per IP + user
+- Helmet security headers
+- CORS allowlist
+- Joi input validation
+- Parameterized SQL queries
+
 ### Performance
-- Redis caching with invalidation
+- Redis caching with automatic invalidation
 - BullMQ background jobs
-- Graceful degradation if Redis down
+- Graceful degradation if Redis is down
 
 ### Engineering
 - Docker + Compose
 - CI/CD with GitHub Actions
 - 121 Jest tests (unit + integration)
 - 41% coverage, 94% on routes
-- Branch protection on main
+- Branch protection on `main`
+- Structured logging with Winston
 
 ---
 
 ## Tech Stack
 
-**Backend:** Node.js 20, Express, PostgreSQL (raw SQL), Redis, BullMQ, Socket.IO, JWT, Bcrypt, Joi, Multer, Brevo (email), Docker
+**Backend:** Node.js 20, Express, PostgreSQL (raw SQL), Redis, BullMQ, Socket.IO, JWT, Bcrypt, Joi, Multer, Brevo (email), Winston (logging), Docker
 
 **Frontend:** React 18, Vite, Tailwind CSS, Zustand, React Router, React Hook Form + Zod, Recharts, dnd-kit, Socket.IO Client, Axios
 
-**Infrastructure:** Vercel (frontend), Render (backend), Supabase (Postgres), Upstash (Redis), Brevo (email), UptimeRobot (keep-alive), GitHub Actions (CI/CD)
+**Infrastructure:** Vercel (frontend), Railway (backend + Redis), Supabase (Postgres), Brevo (email), GitHub Actions (CI/CD)
 
 ---
 
 ## Architecture
 
-```
+```text
 Browser
    │
    ▼
 Vercel (React CDN)
-   │ HTTPS + WebSocket
+   │  HTTPS + WebSocket
    ▼
-Render (Node.js + Docker)
+Railway (Node.js + Docker)
    │
    ├──▶ Supabase (PostgreSQL)
-   ├──▶ Upstash (Redis: cache + queues)
+   ├──▶ Railway Redis (cache + queues)
    └──▶ Brevo (email HTTP API)
 ```
 
@@ -128,7 +148,7 @@ cd TaskFlow
 
 ### Environment Variables
 
-#### Backend (`backend/.env`)
+**Backend** (`backend/.env`)
 
 ```env
 NODE_ENV=development
@@ -166,7 +186,7 @@ EMAIL_VERIFICATION_EXPIRY_HOURS=24
 PASSWORD_RESET_EXPIRY_HOURS=1
 ```
 
-#### Frontend (`frontend/.env`)
+**Frontend** (`frontend/.env`)
 
 ```env
 VITE_API_URL=http://localhost:5000
@@ -195,10 +215,10 @@ npm install
 npm run dev
 ```
 
-Backend: http://localhost:5000
-Frontend: http://localhost:5173
+- Backend: http://localhost:5000
+- Frontend: http://localhost:5173
 
-Verify backend:
+Verify the backend:
 
 ```bash
 curl http://localhost:5000/health
@@ -211,17 +231,20 @@ docker-compose up --build
 ```
 
 Services started:
-- postgres on 5432
-- redis on 6379
-- backend on 5000
-- frontend on 5173
+
+| Service  | Port |
+|----------|------|
+| postgres | 5432 |
+| redis    | 6379 |
+| backend  | 5000 |
+| frontend | 5173 |
 
 Stop:
 
 ```bash
 docker-compose down
 
-# Fresh DB
+# Fresh DB (removes volumes)
 docker-compose down -v
 ```
 
@@ -231,27 +254,31 @@ docker-compose down -v
 
 ### Migrations
 
-SQL files in `backend/src/db/migrations/`. Run:
+SQL files live in `backend/src/db/migrations/`. Run them with:
 
 ```bash
 node src/db/migrate.js
 ```
 
 ### Tables
-- users
-- email_verification_tokens
-- password_reset_tokens
-- workspaces
-- workspace_members
-- workspace_invitations
-- projects
-- project_members
-- tasks
-- comments
-- mentions
-- attachments
-- activity_logs
-- notifications
+
+- `users`
+- `email_verification_tokens`
+- `password_reset_tokens`
+- `sessions` (multi-device tracking)
+- `workspaces`
+- `workspace_members`
+- `workspace_invitations`
+- `projects`
+- `project_members`
+- `tasks`
+- `comments`
+- `mentions`
+- `attachments`
+- `activity_logs`
+- `notifications`
+- `labels`
+- `task_labels`
 
 ---
 
@@ -267,19 +294,20 @@ npm run test:watch    # watch mode
 
 ### Test Suites
 
-| Suite | Count | Type |
-|---|---|---|
-| password.utils | 10 | Unit |
-| user.service | 19 | Unit |
-| task.service | ~30 | Unit |
-| workspace.service | ~40 | Unit |
-| health | 1 | Integration |
-| auth | 12 | Integration |
-| tasks | 14 | Integration |
-| rbac | 11 | Integration |
-| **Total** | **121** | |
+| Suite             | Count | Type        |
+|-------------------|-------|-------------|
+| password.utils    | 10    | Unit        |
+| user.service      | 19    | Unit        |
+| task.service      | ~30   | Unit        |
+| workspace.service | ~40   | Unit        |
+| health            | 1     | Integration |
+| auth              | 12    | Integration |
+| tasks             | 14    | Integration |
+| rbac              | 11    | Integration |
+| **Total**         | **121** |           |
 
 ### Coverage
+
 - Overall: ~41% statements
 - Routes: 94.82%
 - Validators: 100%
@@ -301,7 +329,7 @@ File: `.github/workflows/ci.yml`
 
 **Pipeline:**
 1. Checkout code
-2. Setup Node.js 20
+2. Set up Node.js 20
 3. Start Postgres 16 + Redis 7 containers
 4. `npm ci`
 5. Run migrations
@@ -314,13 +342,13 @@ Duration: ~2 minutes
 ### Branch Protection
 
 `main` is protected:
-- Requires PR
-- Requires `CI / Lint & Test` check
-- Requires branches up to date
+- Requires a PR
+- Requires the `CI / Lint & Test` check
+- Requires branches to be up to date
 
 ### Deploy Flow
 
-```
+```text
 Push to JestTesting → CI ✅ → Open PR → CI ✅ → Merge → Auto-deploy
 ```
 
@@ -328,176 +356,199 @@ Push to JestTesting → CI ✅ → Open PR → CI ✅ → Merge → Auto-deploy
 
 ## Deployment
 
-### Production Stack (100% free tier)
+### Production Stack
 
-| Layer | Service |
-|---|---|
-| Frontend | Vercel |
-| Backend | Render (Docker) |
-| Database | Supabase |
-| Cache | Upstash |
-| Email | Brevo |
-| Keep-alive | UptimeRobot |
+| Layer    | Service       |
+|----------|---------------|
+| Frontend | Vercel        |
+| Backend  | Railway (Docker) |
+| Database | Supabase      |
+| Cache    | Railway Redis |
+| Email    | Brevo         |
 
 ### Vercel (frontend)
-1. Connect GitHub repo
-2. Root Directory: `frontend`
-3. Env: `VITE_API_URL=https://taskflow-90rv.onrender.com`
 
-### Render (backend)
-1. Connect GitHub repo
-2. Create Web Service
-3. Runtime: Docker
-4. Set all `.env` vars
-5. Health check: `/health`
+1. Connect the GitHub repo
+2. Root Directory: `frontend`
+3. Env: `VITE_API_URL=https://taskflow-backend-production-0006.up.railway.app`
+
+### Railway (backend + Redis)
+
+1. Connect the GitHub repo
+2. Create a Web Service from the `backend` folder
+3. Railway auto-detects the Dockerfile
+4. Add a Redis plugin — Railway auto-injects `REDIS_URL`
+5. Set all other `.env` vars as environment variables
+6. Health check path: `/health`
+7. Railway auto-deploys on every push to `main`
+
+**Why Railway over other platforms:**
+- Native Docker support with auto-detection
+- Built-in Redis addon — one click to add, auto-injected env vars
+- No cold-start / sleeping
+- Automatic HTTPS + custom domains
+- Real-time logs and metrics built into the dashboard
+- One environment for both backend and Redis — simpler mental model
 
 ### Supabase (database)
-1. Create project
-2. Use pooler connection string (IPv4)
+
+1. Create a project
+2. Use the pooler connection string (IPv4)
 3. Run migrations
 
-### Upstash (Redis)
-1. Create database
-2. Copy `rediss://` URL
-3. Set `REDIS_URL`
+### Brevo (email)
 
-### UptimeRobot
-- Add HTTP monitor: `https://taskflow-90rv.onrender.com/health`
-- Interval: 5 minutes
+1. Create a Brevo account
+2. Verify a sender email
+3. Generate an API key
+4. Set `BREVO_API_KEY`, `EMAIL_FROM_EMAIL`, `EMAIL_FROM_NAME`
 
 ---
 
 ## API Reference
 
-Base URL: `http://localhost:5000/api` (or production)
+**Base URL:** `http://localhost:5000/api` (or production)
 
-Auth header: `Authorization: Bearer <access_token>`
+**Auth header:** `Authorization: Bearer <access_token>`
 
 ### Auth
 
 | Method | Endpoint |
-|---|---|
-| POST | /auth/register |
-| POST | /auth/login |
-| POST | /auth/refresh |
-| POST | /auth/logout |
-| POST | /auth/logout-all |
-| POST | /auth/verify-email |
-| POST | /auth/resend-verification |
-| POST | /auth/forgot-password |
-| POST | /auth/reset-password |
-| GET | /auth/profile |
-| PATCH | /auth/profile |
-| PATCH | /auth/password |
-| DELETE | /auth/account |
+|--------|----------|
+| POST   | `/auth/register` |
+| POST   | `/auth/login` |
+| POST   | `/auth/refresh` |
+| POST   | `/auth/logout` |
+| POST   | `/auth/logout-all` |
+| POST   | `/auth/verify-email` |
+| POST   | `/auth/resend-verification` |
+| POST   | `/auth/forgot-password` |
+| POST   | `/auth/reset-password` |
+| GET    | `/auth/profile` |
+| PATCH  | `/auth/profile` |
+| PATCH  | `/auth/password` |
+| DELETE | `/auth/account` |
+| GET    | `/auth/sessions` |
+| DELETE | `/auth/sessions/:id` |
 
 ### Workspaces
 
 | Method | Endpoint |
-|---|---|
-| GET | /workspaces |
-| POST | /workspaces |
-| GET | /workspaces/:id |
-| PATCH | /workspaces/:id |
-| DELETE | /workspaces/:id |
-| GET | /workspaces/:id/members |
-| POST | /workspaces/:id/members |
-| PATCH | /workspaces/:id/members/:memberId |
-| DELETE | /workspaces/:id/members/:memberId |
-| GET | /workspaces/:id/invitations |
-| DELETE | /workspaces/:id/invitations/:id |
+|--------|----------|
+| GET    | `/workspaces` |
+| POST   | `/workspaces` |
+| GET    | `/workspaces/:id` |
+| PATCH  | `/workspaces/:id` |
+| DELETE | `/workspaces/:id` |
+| GET    | `/workspaces/:id/members` |
+| POST   | `/workspaces/:id/members` |
+| PATCH  | `/workspaces/:id/members/:memberId` |
+| DELETE | `/workspaces/:id/members/:memberId` |
+| GET    | `/workspaces/:id/invitations` |
+| DELETE | `/workspaces/:id/invitations/:id` |
 
 ### Projects
 
 | Method | Endpoint |
-|---|---|
-| GET | /workspaces/:wid/projects |
-| POST | /workspaces/:wid/projects |
-| GET | /projects/:id |
-| PATCH | /projects/:id |
-| DELETE | /projects/:id |
-| POST | /projects/:id/archive |
-| POST | /projects/:id/unarchive |
+|--------|----------|
+| GET    | `/workspaces/:wid/projects` |
+| POST   | `/workspaces/:wid/projects` |
+| GET    | `/projects/:id` |
+| PATCH  | `/projects/:id` |
+| DELETE | `/projects/:id` |
+| POST   | `/projects/:id/archive` |
+| POST   | `/projects/:id/unarchive` |
 
 ### Tasks
 
 | Method | Endpoint |
-|---|---|
-| GET | /projects/:id/tasks |
-| POST | /projects/:id/tasks |
-| GET | /tasks/:id |
-| PATCH | /tasks/:id |
-| PATCH | /tasks/:id/status |
-| DELETE | /tasks/:id |
-| POST | /tasks/:id/duplicate |
-| POST | /tasks/:id/archive |
-| POST | /tasks/:id/unarchive |
-| GET | /my-tasks |
-| GET | /projects/:id/tasks/stats |
+|--------|----------|
+| GET    | `/projects/:id/tasks` |
+| POST   | `/projects/:id/tasks` |
+| GET    | `/tasks/:id` |
+| PATCH  | `/tasks/:id` |
+| PATCH  | `/tasks/:id/status` |
+| DELETE | `/tasks/:id` |
+| POST   | `/tasks/:id/duplicate` |
+| POST   | `/tasks/:id/archive` |
+| POST   | `/tasks/:id/unarchive` |
+| GET    | `/my-tasks` |
+| GET    | `/projects/:id/tasks/stats` |
+
+### Labels
+
+| Method | Endpoint |
+|--------|----------|
+| GET    | `/projects/:id/labels` |
+| POST   | `/projects/:id/labels` |
+| PATCH  | `/labels/:id` |
+| DELETE | `/labels/:id` |
+| POST   | `/tasks/:taskId/labels/:labelId` |
+| DELETE | `/tasks/:taskId/labels/:labelId` |
 
 ### Comments
 
 | Method | Endpoint |
-|---|---|
-| GET | /tasks/:id/comments |
-| POST | /tasks/:id/comments |
-| PATCH | /comments/:id |
-| DELETE | /comments/:id |
+|--------|----------|
+| GET    | `/tasks/:id/comments` |
+| POST   | `/tasks/:id/comments` |
+| PATCH  | `/comments/:id` |
+| DELETE | `/comments/:id` |
 
 ### Notifications
 
 | Method | Endpoint |
-|---|---|
-| GET | /notifications |
-| GET | /notifications/unread-count |
-| PATCH | /notifications/:id/read |
-| PATCH | /notifications/read-all |
-| DELETE | /notifications/:id |
-| DELETE | /notifications |
+|--------|----------|
+| GET    | `/notifications` |
+| GET    | `/notifications/unread-count` |
+| PATCH  | `/notifications/:id/read` |
+| PATCH  | `/notifications/read-all` |
+| DELETE | `/notifications/:id` |
+| DELETE | `/notifications` |
 
 ### Dashboard
 
 | Method | Endpoint |
-|---|---|
-| GET | /workspaces/:id/dashboard |
-| GET | /workspaces/:id/dashboard/trends |
-| GET | /workspaces/:id/dashboard/team |
-| GET | /workspaces/:id/dashboard/projects |
-| GET | /workspaces/:id/dashboard/overdue |
+|--------|----------|
+| GET    | `/workspaces/:id/dashboard` |
+| GET    | `/workspaces/:id/dashboard/trends` |
+| GET    | `/workspaces/:id/dashboard/team` |
+| GET    | `/workspaces/:id/dashboard/projects` |
+| GET    | `/workspaces/:id/dashboard/overdue` |
 
 ### Search & Attachments
 
 | Method | Endpoint |
-|---|---|
-| GET | /search?q=query |
-| GET | /tasks/:id/attachments |
-| POST | /tasks/:id/attachments |
-| DELETE | /attachments/:id |
-| GET | /uploads/:year/:month/:filename |
+|--------|----------|
+| GET    | `/search?q=query` |
+| GET    | `/tasks/:id/attachments` |
+| POST   | `/tasks/:id/attachments` |
+| DELETE | `/attachments/:id` |
+| GET    | `/uploads/:year/:month/:filename` |
 
 ### Health
 
 | Method | Endpoint |
-|---|---|
-| GET | /health |
-| GET | /health/detailed |
+|--------|----------|
+| GET    | `/health` |
+| GET    | `/health/detailed` |
 
 ---
 
 ## Project Structure
 
-```
+```text
 TaskFlow/
 ├── .github/workflows/ci.yml
 ├── backend/
 │   ├── src/
 │   │   ├── app.js
 │   │   ├── index.js
-│   │   ├── config/           # DB, Redis, queues, socket, upload
+│   │   ├── config/           # DB, Redis, queues, socket, upload, logger
 │   │   ├── controllers/      # HTTP layer
 │   │   ├── services/         # Business logic
 │   │   ├── routes/           # Express routers
-│   │   ├── middleware/       # Auth, RBAC, validation
+│   │   ├── middleware/       # Auth, RBAC, validation, logger
 │   │   ├── db/
 │   │   │   ├── migrations/   # SQL migrations
 │   │   │   ├── migrate.js
@@ -521,7 +572,6 @@ TaskFlow/
 │   ├── vercel.json
 │   └── package.json
 ├── docker-compose.yml
-├── render.yaml
 └── README.md
 ```
 
@@ -532,13 +582,16 @@ TaskFlow/
 - **Raw SQL over ORM** — full query control, explicit joins, no N+1 surprises
 - **Service + Controller + Query pattern** — clear separation, testable layers
 - **Redis caching with invalidation** — dashboard went from 400ms → 20ms
-- **cacheWrapper pattern** — single helper, graceful degradation if Redis down
-- **BullMQ for emails** — API responses instant (~50ms)
+- **`cacheWrapper` pattern** — single helper, graceful degradation if Redis is down
+- **BullMQ for emails** — API responses stay instant (~50ms)
 - **Socket.IO for real-time** — `emitToUser` + `emitToWorkspace`
-- **Multi-tenant via workspace_members** — RBAC in middleware + services
-- **Position-based ordering** — Kanban reorder is single UPDATE
-- **Soft deletes with email masking** — preserves audit trail, frees email
-- **Brevo HTTP API over SMTP** — Render blocks SMTP on free tier
+- **Multi-tenant via `workspace_members`** — RBAC in middleware + services
+- **Position-based ordering** — Kanban reorder is a single UPDATE
+- **Soft deletes with email masking** — preserves audit trail, frees the email
+- **Brevo HTTP API over SMTP** — some hosts block SMTP on free tiers
+- **Per-session tracking** — every login creates a session row, `sessionId` is embedded in the JWT and checked on every request
+- **Instant session revocation** — delete the session row → middleware rejects the next request
+- **Winston structured logging** — correlation IDs, JSON in production, graceful levels
 
 ---
 
@@ -546,31 +599,33 @@ TaskFlow/
 
 ### Cache Keys
 
-| Key | TTL |
-|---|---|
-| user:<id>:auth | 300s |
-| user:<id>:workspaces | 120s |
-| workspace:<id>:access:<uid> | 60s |
-| workspace:<id>:role:<uid> | 60s |
-| workspace:<id>:members | 60s |
-| dashboard:*:<workspaceId> | 60s |
-| mytasks:<uid>:* | 30s |
+| Key                            | TTL  |
+|--------------------------------|------|
+| `user:<id>:auth`               | 300s |
+| `user:<id>:workspaces`         | 120s |
+| `session:<id>:active`          | 30s  |
+| `workspace:<id>:access:<uid>`  | 60s  |
+| `workspace:<id>:role:<uid>`    | 60s  |
+| `workspace:<id>:members`       | 60s  |
+| `dashboard:*:<workspaceId>`    | 60s  |
+| `mytasks:<uid>:*`              | 30s  |
 
 ### Before vs After
 
-| Endpoint | Before | After |
-|---|---|---|
-| /workspaces | ~500ms | ~20ms |
-| /dashboard | ~400ms | ~15-30ms |
-| /notifications/unread-count | ~130ms | ~30ms |
+| Endpoint                       | Before | After     |
+|--------------------------------|--------|-----------|
+| `/workspaces`                  | ~500ms | ~20ms     |
+| `/dashboard`                   | ~400ms | ~15–30ms  |
+| `/notifications/unread-count`  | ~130ms | ~30ms     |
 
 ---
 
 ## Security
 
 - JWT with 15m access + 7d refresh tokens
+- Refresh token rotation on every use
+- Per-device session tracking with instant revocation
 - Bcrypt password hashing
-- Refresh token rotation
 - Helmet security headers
 - CORS allowlist
 - Rate limiting per IP + user
@@ -580,34 +635,37 @@ TaskFlow/
 - RBAC middleware + service checks
 - Soft delete with email masking
 - Single-use tokens for verify/reset
+- Trust proxy for real client IPs
 
 ---
 
 ## Roadmap
 
 ### Done
-- Auth, workspaces, projects, tasks
-- Kanban board
-- Comments with @mentions
-- Activity log
-- Real-time notifications
-- File attachments
-- Global search
-- Dashboard + analytics
-- Redis caching
-- BullMQ jobs
-- Docker + Compose
-- Full deployment
-- Jest testing (121 tests)
-- CI/CD with GitHub Actions
+- [x] Auth, workspaces, projects, tasks
+- [x] Kanban board
+- [x] Comments with @mentions
+- [x] Activity log
+- [x] Real-time notifications
+- [x] File attachments
+- [x] Global search
+- [x] Dashboard + analytics
+- [x] Redis caching
+- [x] BullMQ jobs
+- [x] Docker + Compose
+- [x] Full deployment
+- [x] Jest testing (121 tests)
+- [x] CI/CD with GitHub Actions
+- [x] Task labels/tags
+- [x] Winston logging
+- [x] Multi-device session management
+- [x] Mobile-responsive sidebar
 
 ### Planned
-- Playwright E2E tests
-- Task labels/tags
-- Swagger API docs
-- Winston logging
-- Dark mode
-- Demo video
+- [ ] Playwright E2E tests
+- [ ] Swagger API docs
+- [ ] Dark mode
+- [ ] Demo video
 
 ---
 
@@ -615,9 +673,7 @@ TaskFlow/
 
 MIT
 
----
-
 ## Contact
 
-**Ankit Raj**
+**Ankit Raj**  
 GitHub: [@ankitraj-1602](https://github.com/ankitraj-1602)
