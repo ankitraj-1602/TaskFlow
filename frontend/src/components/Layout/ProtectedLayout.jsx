@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
 import { Navbar } from './Navbar';
@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar';
 
 export const ProtectedLayout = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -24,9 +25,13 @@ export const ProtectedLayout = ({ children }) => {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Navbar />
+        {/* <Navbar /> */}
+        <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>
