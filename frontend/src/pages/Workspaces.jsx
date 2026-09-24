@@ -9,6 +9,7 @@ import { Input } from '../components/Forms/Input';
 import { Button } from '../components/Forms/Button';
 import { useWorkspaceStore } from '../store/workspace.store';
 import { PlusIcon, PencilIcon, TrashIcon, UsersIcon, BuildingOffice2Icon } from '@heroicons/react/24/outline';
+import Loader from '../components/Loader';
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -87,7 +88,7 @@ export const Workspaces = () => {
         {/* Workspace Grid */}
         {isLoading && workspaces.length === 0 ? (
           <div className="flex justify-center py-24">
-            <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
+            <Loader/>
           </div>
         ) : workspaces.length === 0 ? (
           <div className="text-center py-16 px-6 bg-white rounded-2xl border border-dashed border-gray-200">

@@ -23,6 +23,7 @@ import {
   ArrowLeftIcon,
   FunnelIcon,
 } from '@heroicons/react/24/outline';
+import Loader from '../components/Loader';
 
 const createProjectSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -186,7 +187,7 @@ export const Projects = () => {
         {/* Projects Grid */}
         {isLoading && projects.length === 0 ? (
           <div className="flex justify-center py-16">
-            <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
+            <Loader/>
           </div>
         ) : filteredProjects.length === 0 ? (
           <EmptyState

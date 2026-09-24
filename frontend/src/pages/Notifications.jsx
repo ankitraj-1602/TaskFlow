@@ -6,6 +6,7 @@ import { Button } from '../components/Forms/Button';
 import { EmptyState } from '../components/UI/EmptyState';
 import { useNotificationStore } from '../store/notification.store';
 import { BellIcon, CheckIcon } from '@heroicons/react/24/outline';
+import Loader from '../components/Loader';
 
 const FILTERS = [
   { id: 'all', label: 'All' },
@@ -107,7 +108,7 @@ export const Notifications = () => {
         <div className="bg-white rounded-lg shadow overflow-hidden">
           {isLoading && notifications.length === 0 ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+              <Loader/>
             </div>
           ) : notifications.length === 0 ? (
             <EmptyState

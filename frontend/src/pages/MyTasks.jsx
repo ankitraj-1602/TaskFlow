@@ -10,6 +10,7 @@ import { useTaskStore } from '../store/task.store';
 import { taskApi } from '../api/task.api';
 import { LabelBadge } from '../components/Label/LabelBadge';
 import { CalendarIcon } from '@heroicons/react/24/outline';
+import Loader from "../components/Loader"
 
 export const MyTasks = () => {
   const navigate = useNavigate();
@@ -90,7 +91,7 @@ export const MyTasks = () => {
         {/* Task List */}
         {isLoading && myTasks.length === 0 ? (
           <div className="flex justify-center py-16">
-            <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div>
+            <Loader/>
           </div>
         ) : myTasks.length === 0 ? (
           <EmptyState
