@@ -6,6 +6,7 @@ import { EmptyState } from '../components/UI/EmptyState';
 import { Badge } from '../components/UI/Badge';
 import { workspaceApi } from '../api/workspace.api';
 import { MagnifyingGlassIcon, BriefcaseIcon } from '@heroicons/react/24/outline';
+import Loader from '../components/Loader';
 
 const roleVariant = {
   OWNER: 'purple',
@@ -72,7 +73,7 @@ export const Team = () => {
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            <Loader/>
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState

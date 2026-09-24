@@ -12,6 +12,7 @@ import { OverdueList } from '../components/Dashboard/OverdueList';
 import { useAuthStore } from '../store/auth.store';
 import { useWorkspaceStore } from '../store/workspace.store';
 import { useDashboardStore } from '../store/dashboard.store';
+import Loader from "../components/Loader"
 import {
   ChartBarIcon,
   UsersIcon,
@@ -126,7 +127,7 @@ export const Dashboard = () => {
         {/* Loading state */}
         {isLoading && !stats && (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            <Loader/>
           </div>
         )}
 
