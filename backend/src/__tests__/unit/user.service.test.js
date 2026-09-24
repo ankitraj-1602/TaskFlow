@@ -1,15 +1,38 @@
 // ─── Mock ALL external dependencies BEFORE requiring the service ───
 jest.mock('../../db/queries/user.queries');
+jest.mock('../../db/queries/session.queries', () => ({
+  create: jest.fn().mockResolvedValue({ id: 'session-test-id' }),
+  findByRefreshToken: jest.fn(),
+  findByUser: jest.fn().mockResolvedValue([]),
+  findById: jest.fn().mockResolvedValue(null),
+  rotateRefreshToken: jest.fn().mockResolvedValue({ id: 'session-test-id' }),
+  deleteByRefreshToken: jest.fn(),
+  deleteById: jest.fn(),
+  deleteAllForUser: jest.fn().mockResolvedValue(1),
+  updateLastUsed: jest.fn(),
+}));
 jest.mock('../../utils/password.utils');
 jest.mock('../../utils/jwt.utils');
 jest.mock('../../services/email.service');
 jest.mock('../../utils/token.utils');
 jest.mock('../../utils/cache.utils');
 jest.mock('../../jobs/email.producer');
+jest.mock('../../db/queries/session.queries', () => ({
+  create: jest.fn().mockResolvedValue({ id: 'session-test-id' }),
+  findByRefreshToken: jest.fn(),
+  findByUser: jest.fn().mockResolvedValue([]),
+  findById: jest.fn().mockResolvedValue(null),
+  rotateRefreshToken: jest.fn().mockResolvedValue({ id: 'session-test-id' }),
+  deleteByRefreshToken: jest.fn(),
+  deleteById: jest.fn(),
+  deleteAllForUser: jest.fn(),
+  updateLastUsed: jest.fn(),
+}));
 
 // ─── Now require the service (dependencies come back as mocks) ───
 const UserService = require('../../services/user.service');
 const UserQueries = require('../../db/queries/user.queries');
+const SessionQueries = require('../../db/queries/session.queries');
 const { hashPassword, comparePassword } = require('../../utils/password.utils');
 const {
   generateAccessToken,
@@ -110,15 +133,16 @@ describe('UserService', () => {
       });
     });
 
-    it('should save the refresh token to the DB', async () => {
+    it('should create a session with the refresh token', async () => {
       setupSuccessfulRegister();
 
       await userService.register(validInput);
 
-      expect(UserQueries.updateRefreshToken).toHaveBeenCalledWith(
-        'new-user-id',
-        'refresh-token',
-        expect.any(Date)
+      expect(SessionQueries.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'new-user-id',
+          refreshToken: 'refresh-token',
+        })
       );
     });
 
@@ -299,7 +323,7 @@ describe('UserService', () => {
       ).rejects.toThrow('Current password is incorrect');
     });
 
-    it('should hash new password, clear refresh tokens, invalidate cache', async () => {
+    it('should hash new password, clear sessions, invalidate cache', async () => {
       UserQueries.findById.mockResolvedValue({
         id: 'user-id',
         password_hash: 'hashed-old',
@@ -307,9 +331,8 @@ describe('UserService', () => {
       comparePassword.mockResolvedValue(true);
       hashPassword.mockResolvedValue('hashed-new');
       UserQueries.updatePassword.mockResolvedValue();
-      UserQueries.clearRefreshToken.mockResolvedValue();
+      SessionQueries.deleteAllForUser.mockResolvedValue(1);
       invalidateCache.mockResolvedValue();
-      buildKey.mockReturnValue('user:user-id:auth');
 
       const result = await userService.changePassword(
         'user-id',
@@ -322,7 +345,7 @@ describe('UserService', () => {
         'user-id',
         'hashed-new'
       );
-      expect(UserQueries.clearRefreshToken).toHaveBeenCalledWith('user-id');
+      expect(SessionQueries.deleteAllForUser).toHaveBeenCalledWith('user-id');
       expect(invalidateCache).toHaveBeenCalled();
       expect(result).toBe(true);
     });
