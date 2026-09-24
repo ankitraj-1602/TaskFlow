@@ -316,9 +316,10 @@ const {
 const { invalidateCache, buildKey } = require('../utils/cache.utils');
 const EmailProducer = require('../jobs/email.producer');
 const logger = require('../config/logger');
+const SessionQueries = require('../db/queries/session.queries');
 
 class UserService {
-  async register(userData) {
+  async register(userData, metadata = {}) {
     const { email, password, name, jobTitle, timezone } = userData;
 
     const existingUser = await UserQueries.findByEmail(email);
@@ -337,18 +338,50 @@ class UserService {
       timezone: timezone || 'UTC',
     });
 
-    const accessToken = generateAccessToken({
-      userId: user.id,
-      email: user.email,
-    });
+    // const accessToken = generateAccessToken({
+    //   userId: user.id,
+    //   email: user.email,
+    // });
 
+    // const refreshToken = generateRefreshToken({
+    //   userId: user.id,
+    //   email: user.email,
+    // });
+
+    // // const tokenExpiry = getTokenExpiry(refreshToken);
+    // // await UserQueries.updateRefreshToken(user.id, refreshToken, tokenExpiry);
+    // const tokenExpiry = getTokenExpiry(refreshToken);
+
+    // await SessionQueries.create({
+    //   userId: user.id,
+    //   refreshToken,
+    //   refreshTokenExpiry: tokenExpiry,
+    //   userAgent: metadata?.userAgent,
+    //   ipAddress: metadata?.ipAddress,
+    // });
+
+    // Create session FIRST so we can embed its ID in the JWT
     const refreshToken = generateRefreshToken({
       userId: user.id,
       email: user.email,
     });
 
     const tokenExpiry = getTokenExpiry(refreshToken);
-    await UserQueries.updateRefreshToken(user.id, refreshToken, tokenExpiry);
+
+    const session = await SessionQueries.create({
+      userId: user.id,
+      refreshToken,
+      refreshTokenExpiry: tokenExpiry,
+      userAgent: metadata.userAgent,
+      ipAddress: metadata.ipAddress,
+    });
+
+    // Now generate the access token with sessionId embedded
+    const accessToken = generateAccessToken({
+      userId: user.id,
+      email: user.email,
+      sessionId: session.id,   // ⬅️ embed the session
+    });
 
     try {
       const verificationToken = await createEmailVerificationToken(user.id, 24);
@@ -378,7 +411,7 @@ class UserService {
     };
   }
 
-  async login(email, password) {
+  async login(email, password, metadata = {}) {
     const user = await UserQueries.findByEmail(email);
     if (!user) throw new Error('Invalid email or password');
     if (user.deleted_at) throw new Error('Account has been deactivated');
@@ -388,18 +421,49 @@ class UserService {
 
     await UserQueries.updateLastLogin(user.id);
 
-    const accessToken = generateAccessToken({
-      userId: user.id,
-      email: user.email,
-    });
+    // const accessToken = generateAccessToken({
+    //   userId: user.id,
+    //   email: user.email,
+    // });
 
+    // const refreshToken = generateRefreshToken({
+    //   userId: user.id,
+    //   email: user.email,
+    // });
+    // Create session FIRST so we can embed its ID in the JWT
     const refreshToken = generateRefreshToken({
       userId: user.id,
       email: user.email,
     });
 
     const tokenExpiry = getTokenExpiry(refreshToken);
-    await UserQueries.updateRefreshToken(user.id, refreshToken, tokenExpiry);
+
+    const session = await SessionQueries.create({
+      userId: user.id,
+      refreshToken,
+      refreshTokenExpiry: tokenExpiry,
+      userAgent: metadata.userAgent,
+      ipAddress: metadata.ipAddress,
+    });
+
+    // Now generate the access token with sessionId embedded
+    const accessToken = generateAccessToken({
+      userId: user.id,
+      email: user.email,
+      sessionId: session.id,   // ⬅️ embed the session
+    });
+
+    // const tokenExpiry = getTokenExpiry(refreshToken);
+
+    // ⬇️ Save session instead of overwriting a single refresh token
+    // await SessionQueries.create({
+    //   userId: user.id,
+    //   refreshToken,
+    //   refreshTokenExpiry: tokenExpiry,
+    //   userAgent: metadata.userAgent,
+    //   ipAddress: metadata.ipAddress,
+    // });
+    // await UserQueries.updateRefreshToken(user.id, refreshToken, tokenExpiry);
 
     const { password_hash, refresh_token, refresh_token_expiry, ...userWithoutSensitive } = user;
 
@@ -415,16 +479,46 @@ class UserService {
     };
   }
 
+  // async refreshToken(refreshToken) {
+  //   const decoded = verifyRefreshToken(refreshToken);
+  //   if (!decoded) throw new Error('Invalid refresh token');
+
+  //   const user = await UserQueries.findByRefreshToken(refreshToken);
+  //   if (!user) throw new Error('Invalid refresh token');
+
+  //   const newAccessToken = generateAccessToken({
+  //     userId: user.id,
+  //     email: user.email,
+  //   });
+
+  //   const newRefreshToken = generateRefreshToken({
+  //     userId: user.id,
+  //     email: user.email,
+  //   });
+
+  //   const tokenExpiry = getTokenExpiry(newRefreshToken);
+  //   await UserQueries.updateRefreshToken(user.id, newRefreshToken, tokenExpiry);
+
+  //   return {
+  //     accessToken: newAccessToken,
+  //     refreshToken: newRefreshToken,
+  //   };
+  // }
   async refreshToken(refreshToken) {
     const decoded = verifyRefreshToken(refreshToken);
     if (!decoded) throw new Error('Invalid refresh token');
 
-    const user = await UserQueries.findByRefreshToken(refreshToken);
-    if (!user) throw new Error('Invalid refresh token');
+    // ⬇️ Look up session instead of user
+    const session = await SessionQueries.findByRefreshToken(refreshToken);
+    if (!session) throw new Error('Invalid or expired refresh token');
 
+    const user = { id: session.user_id, email: session.email };
+
+    // ✅ Include sessionId in the NEW access token too
     const newAccessToken = generateAccessToken({
       userId: user.id,
       email: user.email,
+      sessionId: session.id,   // ⬅️ CRITICAL
     });
 
     const newRefreshToken = generateRefreshToken({
@@ -433,7 +527,12 @@ class UserService {
     });
 
     const tokenExpiry = getTokenExpiry(newRefreshToken);
-    await UserQueries.updateRefreshToken(user.id, newRefreshToken, tokenExpiry);
+
+    await SessionQueries.rotateRefreshToken(
+      session.id,
+      newRefreshToken,
+      tokenExpiry
+    );
 
     return {
       accessToken: newAccessToken,
@@ -441,17 +540,44 @@ class UserService {
     };
   }
 
-  async logout(userId) {
-    await UserQueries.clearRefreshToken(userId);
-    // ✅ Success
-    logger.info('User logged out', { userId });
+  async logout(refreshToken, sessionId) {
+    try {
+      let targetSessionId = null;
+
+      if (refreshToken) {
+        const session = await SessionQueries.findByRefreshToken(refreshToken);
+        if (session) {
+          targetSessionId = session.id;
+          await SessionQueries.deleteByRefreshToken(refreshToken);
+        }
+      }
+
+      // Fallback: use sessionId from JWT
+      if (!targetSessionId && sessionId) {
+        targetSessionId = sessionId;
+        await SessionQueries.deleteById(sessionId, sessionId);   // user_id doesn't matter here
+      }
+
+      if (targetSessionId) {
+        await invalidateCache(buildKey('session', targetSessionId, 'active'));
+      }
+    } catch (err) {
+      // Silent — logout should never fail
+    }
     return true;
   }
 
   async logoutAllDevices(userId) {
-    await UserQueries.clearRefreshToken(userId);
-    // ✅ Success
-    logger.info('User logged out of all devices', { userId });
+    // Find all sessions first so we can invalidate their caches
+    const sessions = await SessionQueries.findByUser(userId);
+    await SessionQueries.deleteAllForUser(userId);
+
+    // Invalidate caches
+    const { invalidateCache, buildKey } = require('../utils/cache.utils');
+    for (const s of sessions) {
+      await invalidateCache(buildKey('session', s.id, 'active'));
+    }
+
     return true;
   }
 
@@ -492,10 +618,14 @@ class UserService {
     const hashedPassword = await hashPassword(newPassword);
     await UserQueries.updatePassword(userId, hashedPassword);
 
-    await UserQueries.clearRefreshToken(userId);
-    await invalidateCache(buildKey('user', userId, 'auth'));
+    // await UserQueries.clearRefreshToken(userId);
+    // await invalidateCache(buildKey('user', userId, 'auth'));
 
-    // ✅ Success — security-sensitive action
+    // // ✅ Success — security-sensitive action
+
+    // return true;
+    await SessionQueries.deleteAllForUser(userId);   // ⬅️ logout all devices
+    await invalidateCache(buildKey('user', userId, 'auth'));
     logger.info('User password changed', { userId });
 
     return true;
@@ -587,7 +717,8 @@ class UserService {
     const isPasswordValid = await comparePassword(password, user.password_hash);
     if (!isPasswordValid) throw new Error('Password is incorrect');
 
-    await UserQueries.clearRefreshToken(userId);
+    // await UserQueries.clearRefreshToken(userId);
+    await SessionQueries.deleteAllForUser(userId);
 
     const QueryHelper = require('../db/queries/helper');
     await QueryHelper.query(
@@ -606,6 +737,29 @@ class UserService {
 
     // ✅ Success — compliance milestone
     logger.info('User account deleted', { userId, email: user.email });
+
+    return true;
+  }
+
+  async getUserSessions(userId, currentSessionId = null) {
+    const sessions = await SessionQueries.findByUser(userId);
+    return sessions.map((s) => ({
+      id: s.id,
+      userAgent: s.user_agent,
+      ipAddress: s.ip_address,
+      createdAt: s.created_at,
+      lastUsedAt: s.last_used_at,
+      isCurrent: s.id === currentSessionId,   // ⬅️ compare by session ID
+    }));
+  }
+
+  async revokeSession(sessionId, userId) {
+    const deleted = await SessionQueries.deleteById(sessionId, userId);
+    if (!deleted) throw new Error('Session not found');
+
+    // ⬇️ Invalidate the session cache so the middleware rejects it immediately
+    const { invalidateCache, buildKey } = require('../utils/cache.utils');
+    await invalidateCache(buildKey('session', sessionId, 'active'));
 
     return true;
   }

@@ -69,5 +69,7 @@ router.patch(
 
 router.post('/send-verification', AuthController.sendVerificationEmail);
 router.delete('/account', AuthController.deleteAccount);
+router.get('/sessions', authenticate, AuthController.getSessions);
+router.delete('/sessions/:id', authenticate, AuthController.revokeSession);
 
 module.exports = router;

@@ -14,7 +14,8 @@ export const authApi = {
   },
 
   logout: () => {
-    return apiClient.post('/auth/logout');
+    const refreshToken = localStorage.getItem('refreshToken');
+    return apiClient.post('/auth/logout', { refreshToken });
   },
 
   logoutAll: () => {
@@ -42,13 +43,22 @@ export const authApi = {
   },
 
   verifyEmail: (token) => {
-  return apiClient.post('/auth/verify-email', { token });
-},
+    return apiClient.post('/auth/verify-email', { token });
+  },
 
-sendVerificationEmail: () => {
-  return apiClient.post('/auth/send-verification');
-},
-deleteAccount: (password) => {
-  return apiClient.delete('/auth/account', { data: { password } });
-},
+  sendVerificationEmail: () => {
+    return apiClient.post('/auth/send-verification');
+  },
+  deleteAccount: (password) => {
+    return apiClient.delete('/auth/account', { data: { password } });
+  },
+  getSessions: () => {
+    return apiClient.get('/auth/sessions').then((res) => res.data.data);
+  },
+
+  revokeSession: (sessionId) => {
+    return apiClient
+      .delete(`/auth/sessions/${sessionId}`)
+      .then((res) => res.data.data);
+  },
 };
